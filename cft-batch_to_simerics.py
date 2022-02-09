@@ -257,7 +257,7 @@ Outputs:
 spro_steady_files [list]
 spro_transient_files [list]
 '''
-def performance_map(stage_components, base_name, variations, rpm_data, rpm_values, flowrate_data, flowrate_values):
+def performance_map(run_design_variation, stage_components, base_name, variations, rpm_data, rpm_values, flowrate_data, flowrate_values):
 
     already_run = False
 
@@ -317,8 +317,9 @@ def performance_map(stage_components, base_name, variations, rpm_data, rpm_value
                     elif "transient" in new_file:
                         transient_spro_files.append(new_file)   
 
-    steady_spro_files = sorted(steady_spro_files, key=lambda file: int(re.search(base_name + "(\d+)", file).group(1)))
-    transient_spro_files = sorted(transient_spro_files, key=lambda file: int(re.search(base_name + "(\d+)", file).group(1)))
+    if run_design_variation.lower() == "true":
+        steady_spro_files = sorted(steady_spro_files, key=lambda file: int(re.search(base_name + "(\d+)", file).group(1)))
+        transient_spro_files = sorted(transient_spro_files, key=lambda file: int(re.search(base_name + "(\d+)", file).group(1)))
 
     return steady_spro_files, transient_spro_files
 
@@ -538,7 +539,7 @@ def main():
         return ConfigValue
 
     CFconfig = configparser.ConfigParser()                                                             
-    CFconfig.read("run.cftconf")
+    CFconfig.read("master.cftconf")
     base_file_name = Get_ConfigValue("DesignVariation","base_name")
     run_design_variation = Get_ConfigValue("DesignVariation","run_design_variation")  
     delimiter = Get_ConfigValue("DesignVariation","text_file_delimiter")  
@@ -565,7 +566,7 @@ def main():
 
         if run_simerics.lower() == "true":
             if run_performance_map.lower() == "true":
-                steady_spro_files, transient_spro_files = performance_map(stage_components, "Design", variations, rpm_data, rpm_values, flowrate_data, flowrate_values)
+                steady_spro_files, transient_spro_files = performance_map(run_design_variation, stage_components, "Design", variations, rpm_data, rpm_values, flowrate_data, flowrate_values)
                 spro_files = run_simerics_batch(stage_components, steady_spro_files, transient_spro_files, run_transient, base_file_name + "_simerics.bat", "Design")
             else:
                 spro_files = run_simerics_batch(stage_components, base_steady_spro_files, base_transient_spro_files, run_transient, base_file_name + "_simerics.bat", "Design")
@@ -576,10 +577,10 @@ def main():
 
     elif run_design_variation.lower() == "false" and run_simerics.lower() == "true":
         if run_performance_map.lower() == "true":
-            steady_spro_files, transient_spro_files = performance_map("Design", base_file_name + ".spro", rpm_data, rpm_values, flowrate_data, flowrate_values)
-            spro_files = run_simerics_batch(steady_spro_files, transient_spro_files, run_transient, base_file_name + "_simerics.bat", "Design")
+            steady_spro_files, transient_spro_files = performance_map(run_design_variation, stage_components, "Design", base_file_name + ".spro", rpm_data, rpm_values, flowrate_data, flowrate_values)
+            spro_files = run_simerics_batch(stage_components, steady_spro_files, transient_spro_files, run_transient, base_file_name + "_simerics.bat", "Design")
         else:
-            spro_files = run_simerics_batch(base_file_name + "_steady.spro", base_file_name + "_transient.spro", run_transient, base_file_name + "_simerics.bat", "Design")
+            spro_files = run_simerics_batch(stage_components, base_file_name + "_steady.spro", base_file_name + "_transient.spro", run_transient, base_file_name + "_simerics.bat", "Design")
 
         post_process(run_design_variation, spro_files, "Design", steady_avg_window, transient_avg_window)
         combine_csv(base_file_name)

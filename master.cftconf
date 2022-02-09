@@ -1,0 +1,19 @@
+[DesignVariation]
+	base_name = FTnq84
+	run_design_variation = False
+	text_file_delimiter = ,
+
+[Simerics]
+	run_simerics = True
+	run_performance_map = True
+	rpm_data = relative
+	rpm_values = 0.75 1.00
+	flowrate_data = relative
+	flowrate_values = 0.50 1.00 1.50
+
+[steady]
+	avg_window = 10
+	
+[transient]
+	run_transient = True
+	avg_window = 120
