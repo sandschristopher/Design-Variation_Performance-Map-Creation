@@ -485,9 +485,9 @@ def post_process(run_design_variation, spro_files, base_name, steady_avg_window,
 Takes the steady and transient .csv files created in post_process and places them in one .xlsx file.
 
 Inputs:
-base_file_name [string] = 
+project_name [string] = name of project
 '''
-def combine_csv(base_file_name):
+def combine_csv(project_name):
 
     parent_path = os.getcwd()
     csv_files = []
@@ -496,7 +496,7 @@ def combine_csv(base_file_name):
         if 'results' in file and '.csv' in file:
             csv_files.append(file)
 
-    writer = pd.ExcelWriter(base_file_name + '_results.xlsx', engine='xlsxwriter', engine_kwargs={'options': {'strings_to_numbers': True}})
+    writer = pd.ExcelWriter(project_name + '_results.xlsx', engine='xlsxwriter', engine_kwargs={'options': {'strings_to_numbers': True}})
     for csv in csv_files:
         solver_type = csv.split(".")[0].split("_")[-1]
         df = pd.read_csv(csv)
@@ -513,34 +513,44 @@ variations [list] = variation file names
 output_folder [string] = name of output folder containing the resulting geometry variations
 base_name [string] = base name of folder containing .stp files
 '''
-def organize_file_structure(variations, base_name):
+def organize_file_structure(run_design_variation, variations, base_name):
 
     parent_path = os.getcwd()
 
-    for index in range(len(variations)):
+    if run_design_variation.lower() == "true":
+        for index in range(len(variations)):
+            for file in os.listdir(parent_path):
+                if base_name in file:
+                    if re.match(base_name + "(\d+)", file).group(1) == str(index) and not os.path.isdir(file) and "steady" in file:
+                        old_path = os.path.join(parent_path, file)
+                        design_folder = os.path.join(parent_path, base_name + str(index))
+                        if not os.path.exists(design_folder):
+                            os.makedirs(design_folder)
+                        steady_folder = os.path.join(design_folder, "steady")
+                        if not os.path.exists(steady_folder):
+                            os.makedirs(steady_folder)
+                        new_path = os.path.join(steady_folder, file)        
+                        shutil.move(old_path, new_path)
+                    
+                    if re.match(base_name + "(\d+)", file).group(1) == str(index) and not os.path.isdir(file) and "transient" in file:
+                        old_path = os.path.join(parent_path, file)
+                        design_folder = os.path.join(parent_path, base_name + str(index))
+                        if not os.path.exists(design_folder):
+                            os.makedirs(design_folder)
+                        steady_folder = os.path.join(design_folder, "transient")
+                        if not os.path.exists(steady_folder):
+                            os.makedirs(steady_folder)
+                        new_path = os.path.join(steady_folder, file)        
+                        shutil.move(old_path, new_path)
+    else:
         for file in os.listdir(parent_path):
-            if base_name in file:
-                if re.match(base_name + "(\d+)", file).group(1) == str(index) and not os.path.isdir(file) and "steady" in file:
-                    old_path = os.path.join(parent_path, file)
-                    design_folder = os.path.join(parent_path, base_name + str(index))
-                    if not os.path.exists(design_folder):
-                        os.makedirs(design_folder)
-                    steady_folder = os.path.join(design_folder, "steady")
-                    if not os.path.exists(steady_folder):
-                        os.makedirs(steady_folder)
-                    new_path = os.path.join(steady_folder, file)        
-                    shutil.move(old_path, new_path)
-                
-                if re.match(base_name + "(\d+)", file).group(1) == str(index) and not os.path.isdir(file) and "transient" in file:
-                    old_path = os.path.join(parent_path, file)
-                    design_folder = os.path.join(parent_path, base_name + str(index))
-                    if not os.path.exists(design_folder):
-                        os.makedirs(design_folder)
-                    steady_folder = os.path.join(design_folder, "transient")
-                    if not os.path.exists(steady_folder):
-                        os.makedirs(steady_folder)
-                    new_path = os.path.join(steady_folder, file)        
-                    shutil.move(old_path, new_path)
+            if "steady" in file:
+                old_path = os.path.join(parent_path, file)
+                steady_folder = os.path.join(parent_path, "steady")
+                if not os.path.exists(steady_folder):
+                    os.makedirs(steady_folder)
+                new_path = os.path.join(steady_folder, file)
+                shutil.move(old_path, new_path)
          
     return 0
 
@@ -589,7 +599,7 @@ def main():
 
             post_process(run_design_variation, spro_files, "Design", steady_avg_window, transient_avg_window)
             combine_csv(project_name)
-            organize_file_structure(variations, "Design")
+            organize_file_structure(run_design_variation, variations, "Design")
 
     elif run_design_variation.lower() == "false" and run_simerics.lower() == "true":
         if run_performance_map.lower() == "true":
@@ -600,6 +610,7 @@ def main():
 
         post_process(run_design_variation, spro_files, "Design", steady_avg_window, transient_avg_window)
         combine_csv(project_name)
+        organize_file_structure(run_design_variation, spro_files, "Design")
 
     else:
         exit()
