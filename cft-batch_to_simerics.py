@@ -15,7 +15,7 @@ Dimensions should be in [m] and angles should be in [deg].
 
 Inputs:
 txt_file [string] = name of .txt file containing geometry variation parameters
-delimeter [string] = delimiter used within .txt file
+delimeter [string] = delimiter used within .txt file to separate values
 
 Outputs:
 values_array [np.array] = np.array of geometry parameter values
@@ -215,6 +215,10 @@ Places each variation into a .bat file then runs .bat file to create respective 
 Inputs:
 cft_batch_file [string] = output .bat file (CFturbo)
 variations [list] = variation file names
+
+Outputs:
+base_steady_spro_files [list] = list of base steady .spro files before performance map alterations to vflow_out and Omega
+base_transient_spro_files [list] = list of base steady .spro files before performance map alterations to vflow_out and Omega
 '''
 def make_batch(cft_bat_file, variations):
 
@@ -246,6 +250,8 @@ def make_batch(cft_bat_file, variations):
 Alters the .spro files of the design variations and creates multiple .spro files for a design performance map.
 
 Inputs:
+run_design_variation [string] = bool-type string that decides whether design variation will occur
+stage_components [list of int] = list of integers representing the inital and final stage components
 base_name [string] = base name of folder containing .stp files
 variations [list] = variation file names
 rpm_type [string]
@@ -254,8 +260,8 @@ flowrate_type [string]
 flowrate_values [list]
 
 Outputs:
-spro_steady_files [list]
-spro_transient_files [list]
+steady_spro_files [list] = list of steady .spro files modified for performance map
+transient_spro_files [list] = list of transient .spro files modified for performance map
 '''
 def performance_map(run_design_variation, stage_components, base_name, variations, rpm_data, rpm_values, flowrate_data, flowrate_values):
 
@@ -330,6 +336,7 @@ Modifies the .spro files to include relevant user expressions for post-processin
 Places each variation into a .bat file then runs .bat file using Simerics.
 
 Inputs:
+stage_components [list of int] = list of integers representing the inital and final stage components
 spro_steady_files [list]
 spro_transient_files [list]
 simerics_batch_file [string] = name of output .bat file (Simerics)
@@ -337,7 +344,7 @@ output_folder [string] = name of output folder containing the resulting geometry
 base_name [string] = base name of folder containing .stp files
 
 Outputs:
-spro_files [list] = .spro files
+spro_files [list] = list of all .spro files ran within Simerics
 '''
 def run_simerics_batch(stage_components, steady_spro_files, transient_spro_files, run_transient, simerics_batch_file, base_name):
 
@@ -381,6 +388,7 @@ def run_simerics_batch(stage_components, steady_spro_files, transient_spro_files
 Averages the each .sres file results and places the values in .csv file.
 
 Inputs:
+run_design_variation [string] = bool-type string that decides whether design variation will occur
 spro_files [list] = .spro files
 output_folder [string] = name of output folder containing the resulting geometry variations
 base_name [string] = base name of folder containing .stp files
@@ -397,7 +405,8 @@ def post_process(run_design_variation, spro_files, base_name, steady_avg_window,
             index = 0
             switch = True
 
-        design_number = re.search(base_name + "(\d+)", spro).group(1)
+        if run_design_variation.lower() == "true":
+            design_number = re.search(base_name + "(\d+)", spro).group(1)
 
         solver_type = spro.split("_")[1]
         
@@ -442,7 +451,7 @@ def post_process(run_design_variation, spro_files, base_name, steady_avg_window,
             desc_Dict['vflow_out'] = 'Outlet volumetric flux'
             formatted_result_Dict['Revolutions'] = rpm
             units_Dict['Revolutions'] = '[rpm]'
-            desc_Dict['Revolutions'] = 'Outlet volumetric flux'
+            desc_Dict['Revolutions'] = '-'
             for key, value in result_Dict.items():
                 if 'userdef.' in key:
                     if "DPtt" + impeller_Number in key:
@@ -471,6 +480,13 @@ def post_process(run_design_variation, spro_files, base_name, steady_avg_window,
 
     return 0
 
+
+'''
+Takes the steady and transient .csv files created in post_process and places them in one .xlsx file.
+
+Inputs:
+base_file_name [string] = 
+'''
 def combine_csv(base_file_name):
 
     parent_path = os.getcwd()
@@ -540,7 +556,7 @@ def main():
 
     CFconfig = configparser.ConfigParser()                                                             
     CFconfig.read("master.cftconf")
-    base_file_name = Get_ConfigValue("DesignVariation","base_name")
+    project_name = Get_ConfigValue("DesignVariation","project_name")
     run_design_variation = Get_ConfigValue("DesignVariation","run_design_variation")  
     delimiter = Get_ConfigValue("DesignVariation","text_file_delimiter")  
     run_simerics = Get_ConfigValue("Simerics","run_simerics")
@@ -554,36 +570,36 @@ def main():
     transient_avg_window = Get_ConfigValue("transient","avg_window")
 
     if run_design_variation.lower() == "true":
-        values_array = txt_to_np(base_file_name + ".txt", delimiter)
-        variables, units, components = make_template(base_file_name + "_steady.cft-batch", "template_steady.cft-batch")
-        variations = make_variations(base_file_name + "_steady.cft-batch", "template_steady.cft-batch", variables, units, components, values_array, "Design")
+        values_array = txt_to_np(project_name + ".txt", delimiter)
+        variables, units, components = make_template(project_name + "_steady.cft-batch", "template_steady.cft-batch")
+        variations = make_variations(project_name + "_steady.cft-batch", "template_steady.cft-batch", variables, units, components, values_array, "Design")
 
         if run_transient.lower() == "true":
-            variables, units, components = make_template(base_file_name + "_transient.cft-batch", "template_transient.cft-batch")
-            variations = variations + make_variations(base_file_name + "_transient.cft-batch", "template_transient.cft-batch", variables, units, components, values_array, "Design")
+            variables, units, components = make_template(project_name + "_transient.cft-batch", "template_transient.cft-batch")
+            variations = variations + make_variations(project_name + "_transient.cft-batch", "template_transient.cft-batch", variables, units, components, values_array, "Design")
 
-        base_steady_spro_files, base_transient_spro_files = make_batch(base_file_name + ".bat", variations)
+        base_steady_spro_files, base_transient_spro_files = make_batch(project_name + ".bat", variations)
 
         if run_simerics.lower() == "true":
             if run_performance_map.lower() == "true":
                 steady_spro_files, transient_spro_files = performance_map(run_design_variation, stage_components, "Design", variations, rpm_data, rpm_values, flowrate_data, flowrate_values)
-                spro_files = run_simerics_batch(stage_components, steady_spro_files, transient_spro_files, run_transient, base_file_name + "_simerics.bat", "Design")
+                spro_files = run_simerics_batch(stage_components, steady_spro_files, transient_spro_files, run_transient, project_name + "_simerics.bat", "Design")
             else:
-                spro_files = run_simerics_batch(stage_components, base_steady_spro_files, base_transient_spro_files, run_transient, base_file_name + "_simerics.bat", "Design")
+                spro_files = run_simerics_batch(stage_components, base_steady_spro_files, base_transient_spro_files, run_transient, project_name + "_simerics.bat", "Design")
 
             post_process(run_design_variation, spro_files, "Design", steady_avg_window, transient_avg_window)
-            combine_csv(base_file_name)
+            combine_csv(project_name)
             organize_file_structure(variations, "Design")
 
     elif run_design_variation.lower() == "false" and run_simerics.lower() == "true":
         if run_performance_map.lower() == "true":
-            steady_spro_files, transient_spro_files = performance_map(run_design_variation, stage_components, "Design", base_file_name + ".spro", rpm_data, rpm_values, flowrate_data, flowrate_values)
-            spro_files = run_simerics_batch(stage_components, steady_spro_files, transient_spro_files, run_transient, base_file_name + "_simerics.bat", "Design")
+            steady_spro_files, transient_spro_files = performance_map(run_design_variation, stage_components, "Design", project_name + ".spro", rpm_data, rpm_values, flowrate_data, flowrate_values)
+            spro_files = run_simerics_batch(stage_components, steady_spro_files, transient_spro_files, run_transient, project_name + "_simerics.bat", "Design")
         else:
-            spro_files = run_simerics_batch(stage_components, base_file_name + "_steady.spro", base_file_name + "_transient.spro", run_transient, base_file_name + "_simerics.bat", "Design")
+            spro_files = run_simerics_batch(stage_components, project_name + "_steady.spro", project_name + "_transient.spro", run_transient, project_name + "_simerics.bat", "Design")
 
         post_process(run_design_variation, spro_files, "Design", steady_avg_window, transient_avg_window)
-        combine_csv(base_file_name)
+        combine_csv(project_name)
 
     else:
         exit()

@@ -1,5 +1,5 @@
 [DesignVariation]
-	base_name = FTnq84
+	project_name = FTnq84
 	run_design_variation = False
 	text_file_delimiter = ,
 
