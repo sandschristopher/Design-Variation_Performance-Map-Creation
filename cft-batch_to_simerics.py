@@ -384,7 +384,7 @@ def run_simerics_batch(stage_components, steady_spro_files, transient_spro_files
         batch_path = os.path.abspath(simerics_batch_file)
         subprocess.call(batch_path)
 
-    if run_transient == True and (os.path.exists(base_name + "0") == False and os.path.exists(transient_spro_files[0].replace(".spro", ".sres")) == False):
+    if run_transient.lower() == "true" and (os.path.exists(base_name + "0") == False and os.path.exists(transient_spro_files[0].replace(".spro", ".sres")) == False):
 
         for spro in transient_spro_files:
             modify_spro(spro, stage_components)
