@@ -5,7 +5,7 @@ import csv
 import os
 import configparser
 import subprocess
-from math import radians
+from math import radians, pi
 import pandas as pd
 from modify_spro import *                                                       
 
@@ -266,6 +266,8 @@ transient_spro_files [list] = list of transient .spro files modified for perform
 def performance_map(run_design_variation, stage_components, base_name, variations, rpm_data, rpm_values, flowrate_data, flowrate_values):
 
     already_run = False
+    volumetric = False
+    mass = False
 
     steady_spro_files = []
     transient_spro_files = []
@@ -276,27 +278,36 @@ def performance_map(run_design_variation, stage_components, base_name, variation
         if ".spro" in file and "rpm" not in file:
             modify_spro(file, stage_components)
             with open(file, 'r') as infile:
-                for line in infile:
+                data = infile.readlines()
+                for line_number, line in enumerate(data):
                     if "vflow_out = " in line:
-                        flowrate_design = float(line.split(" ")[-1].strip())
+                        vflow_out_design = round(float(line.split(" ")[-1].strip()), 5)
+                        volumetric = True
                         continue
-                    if "Omega" in line and " = " in line:
-                        rpm_design = float(line.split(" ")[-1].strip())
-                        impeller_number = re.search("Omega(\d) = ", line).group(1)
-                        break
-            
+                    if "mflow = " in line:
+                        mflow_design = round(float(line.split(" ")[-1].strip()), 5)
+                        mass = True
+                        continue
+                    if "#Angular velocity" in line:
+                        omega_design = round(float(data[line_number + 1].split("=")[1]), 5)
+                    
             if rpm_data.lower() == "relative":
-                rpm_list = [float(rpm_value)*rpm_design for rpm_value in rpm_values]
+                omega_list = [float(rpm_value)*omega_design for rpm_value in rpm_values]
+                rpm_list = [round(omega_value*(30/pi)) for omega_value in omega_list]
             elif rpm_data.lower() == "absolute":
-                rpm_list = rpm_values
+                rpm_list = [round(float(rpm_value)) for rpm_value in rpm_values]
+                omega_list = [rpm_value/(30/pi) for rpm_value in rpm_list]
             else:
                 print("Please choose either relative or absolute for rpm_type.")
                 exit()
 
             if flowrate_data.lower() == "relative":
-                flowrate_list = [float(flowrate_value)*flowrate_design for flowrate_value in flowrate_values]
+                if volumetric == True:
+                    flowrate_list = [round(float(flowrate_value)*vflow_out_design, 5) for flowrate_value in flowrate_values]
+                if mass == True:
+                    flowrate_list = [round(float(flowrate_value)*mflow_design, 5) for flowrate_value in flowrate_values]
             elif flowrate_data.lower() == "absolute":
-                flowrate_list = flowrate_values
+                flowrate_list = [float(flowrate_value) for flowrate_value in flowrate_values]
             else:
                 print("Please choose either relative or absolute for flowrate_type.")
                 exit()
@@ -305,16 +316,24 @@ def performance_map(run_design_variation, stage_components, base_name, variation
                 if str(flowrate_list[-1]) in check and str(round(rpm_list[-1]*9.54929)) in check and base_name + str(len(variations) - 1) in check:
                     already_run = True
 
-            for rpm in rpm_list:
+            for index, omega in enumerate(omega_list):
                 for flowrate in flowrate_list:
-                    new_file = file.split(".")[0] + "_" + str(round(rpm*9.54929)) + "rpm_" + str(flowrate).replace(".", "-") + "m3s.spro"
+                    if volumetric == True:
+                        new_file = file.split(".")[0] + "_" + str(rpm_list[index]) + "rpm_" + str(flowrate).replace(".", "-") + "m3s.spro"
+                    if mass == True:
+                        new_file = file.split(".")[0] + "_" + str(rpm_list[index]) + "rpm_" + str(flowrate).replace(".", "-") + "kgs.spro"
                     if already_run == False:
-                        with open(file, 'r') as infile, open(new_file, 'w') as outfile: 
-                            for line in infile:                                                                     
-                                if ("Omega" + impeller_number + " = ") in line:                                                 
-                                    outfile.write("\t\t" + "Omega" + impeller_number + " = " + str(rpm) + "\n")                 
-                                elif ("vflow_out = ") in line:
+                        with open(file, 'r') as infile, open(new_file, 'w') as outfile:
+                            data = infile.readlines() 
+                            for line_number, line in enumerate(data):                                                                                  
+                                if "vflow_out = " in line:
                                     outfile.write("\t\t" + "vflow_out = " + str(flowrate) + "\n") 
+                                elif "mflow = " in line:
+                                    outfile.write("\t\t" + "mflow = " + str(flowrate) + "\n") 
+                                elif "#Angular velocity" in line:
+                                    impeller_number = re.search("Omega(\d) = ", data[line_number + 1]).group(1)
+                                    data[line_number + 1] = ""
+                                    outfile.write(line + "\t\t" + "Omega" + impeller_number + " = " + str(omega) + "\n")    
                                 else:
                                     outfile.write(line)
 
@@ -397,9 +416,13 @@ avgWindow [int] = number of iterations to calculate average values
 def post_process(run_design_variation, spro_files, base_name, steady_avg_window, transient_avg_window):
 
     switch = False
+    volumetric = False
+    mass = False
     index = 0
     
     for spro in spro_files:
+
+        impeller_numbers = []
 
         if "transient" in spro and switch == False:
             index = 0
@@ -408,23 +431,27 @@ def post_process(run_design_variation, spro_files, base_name, steady_avg_window,
         if run_design_variation.lower() == "true":
             design_number = re.search(base_name + "(\d+)", spro).group(1)
 
-        solver_type = spro.split("_")[1]
-        
-        if solver_type == "steady":
+        if "steady" in spro:
+            solver_type = "steady"
             avgWindow = int(steady_avg_window)
-        if solver_type == "transient":
+        if "transient" in spro:
+            solver_type = "transient"
             avgWindow = int(transient_avg_window)
 
         with open (spro, 'r') as infile:
-
-            for line in infile.readlines():
-                if "vflow_out" in line:
+            data = infile.readlines()
+            for line_number, line in enumerate(data):
+                if "vflow_out = " in line:
                     vflow_out = float(line.split("=")[1])
+                    volumetric = True
                     continue
-                if "Omega" in line:
-                    impeller_Number = re.search("Omega(\d) = ", line).group(1)
-                    rpm = round(float(line.split("=")[1])*9.5493)
-                    break
+                if "mflow = " in line:
+                    mflow = float(line.split("=")[1])
+                    mass = True
+                    continue
+                if "#Angular velocity" in line:
+                    impeller_number = re.search("Omega(\d) = ", data[line_number + 1]).group(1)
+                    rpm = round(float(data[line_number + 1].split("=")[1])*9.5493)
 
         integral_file = spro.split(".")[0] + "_integrals.txt"
 
@@ -437,33 +464,61 @@ def post_process(run_design_variation, spro_files, base_name, steady_avg_window,
             reader = csv.DictReader(result_List, delimiter="\t")
             for row in reader:
                 for key, value in row.items():
-                    if 'userdef.' in key:                                                               
-                        if key in result_Dict:                                                           
-                            result_Dict[key] += float(value)                              
+                    if 'userdef.' in key:
+                        if key in result_Dict:
+                            try:                                                           
+                                result_Dict[key] += float(value)
+                            except ValueError:
+                                print("NaN for " + key + " in " + spro)
+                                continue
                         else:
-                            result_Dict[key] = float(value)
+                            try:
+                                result_Dict[key] = float(value)
+                            except ValueError:
+                                print("NaN for " + key + " in " + spro)
+                                continue
             if run_design_variation.lower() == "true":
                 formatted_result_Dict[base_name] = design_number
                 units_Dict[base_name] = '-'
                 desc_Dict[base_name] = '-'
-            formatted_result_Dict['vflow_out'] = vflow_out
-            units_Dict['vflow_out'] = '[m3/s]'
-            desc_Dict['vflow_out'] = 'Outlet volumetric flux'
+            if volumetric == True:
+                formatted_result_Dict['vflow_out'] = vflow_out
+                units_Dict['vflow_out'] = '[m3/s]'
+                desc_Dict['vflow_out'] = 'Outlet volumetric flux'
+            if mass == True:
+                formatted_result_Dict['mflow'] = mflow
+                units_Dict['mflow'] = '[kg/s]'
+                desc_Dict['mflow'] = 'Mass flow'
             formatted_result_Dict['Revolutions'] = rpm
             units_Dict['Revolutions'] = '[rpm]'
             desc_Dict['Revolutions'] = '-'
             for key, value in result_Dict.items():
                 if 'userdef.' in key:
-                    if "DPtt" + impeller_Number in key:
-                        formatted_result_Dict['DPtt_imp'] = result_Dict[key]/avgWindow  
-                    elif "Eff_tt_" + impeller_Number in key:
-                        formatted_result_Dict['Eff_tt_imp'] = result_Dict[key]/(avgWindow)    
+                    if "_i" in key:
+                        impeller_number = re.search("_(\d)_i", key).group(1)
+                        formatted_result_Dict[key[8:]] = result_Dict[key]/(avgWindow)
+                        if "Eff_tt" in key:
+                            impeller_numbers.append(impeller_number) 
                     else:
                         formatted_result_Dict[key[8:]] = result_Dict[key]/(avgWindow)
-        if run_design_variation.lower() == "true":                              
-            order = [base_name, 'Revolutions', 'vflow_out', 'DPtt', 'DPtt_stage', 'DPtt_imp', 'Eff_tt', 'Eff_tt_stage', 'Eff_tt_imp', 'PC' + impeller_Number, 'Torque' + impeller_Number, 'H', 'H' + impeller_Number]
-        else:
-            order = ['Revolutions', 'vflow_out', 'DPtt', 'DPtt_stage', 'DPtt_imp', 'Eff_tt', 'Eff_tt_stage', 'Eff_tt_imp', 'PC' + impeller_Number, 'Torque' + impeller_Number, 'H', 'H' + impeller_Number]
+        if volumetric == True:
+            if run_design_variation.lower() == "true":                              
+                order = [base_name, 'Revolutions', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
+            else:
+                order = ['Revolutions', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
+        if mass == True:
+            if run_design_variation.lower() == "true":                              
+                order = [base_name, 'Revolutions', 'mflow', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
+            else:
+                order = ['Revolutions', 'mflow', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
+        for number in impeller_numbers:
+            order.append('DPtt' + number)
+            order.append('Eff_tt_' + number + "_i")
+            order.append('PC' + number)
+            order.append('Torque' + number)
+        if len(impeller_numbers) > 1:
+            order.append('PC')
+            order.append('Torque')
         for var in formatted_result_Dict.keys():
             if var not in order:
                 order.append(var)
@@ -610,7 +665,7 @@ def main():
 
         post_process(run_design_variation, spro_files, "Design", steady_avg_window, transient_avg_window)
         combine_csv(project_name)
-        organize_file_structure(run_design_variation, spro_files, "Design")
+        # organize_file_structure(run_design_variation, spro_files, "Design")
 
     else:
         exit()

@@ -48,8 +48,8 @@ def modify_spro(spro_file, stage_components):
 
     with open(spro_file, 'r') as infile:
         for line in infile.readlines():
-            if "#Outlet" in line:
-                indent = " " * (len(line) - len(line.lstrip(" ")))
+            if "#Outlet volumetric flux [m3/s]" in line or "#Mass flow [kg/s]" in line:
+                indent = line.split(" ")[0].split("#")[0]
                 break
 
     # Ensures consistent .sgrd file:
@@ -88,7 +88,7 @@ def modify_spro(spro_file, stage_components):
 
     insert_line(indent + "#head [m]" + "\n" + indent + "plot.H = plot.DPtt/rho/9.81 \n" + indent + "#plot.H:head [m]")
 
-    insert_line(indent + "#head, imp1 [m]" + "\n" + indent + "plot.H" + impeller_number + " = plot.DPtt" + impeller_number + "/rho/9.81 \n" + indent + "#plot.H" + impeller_number + ":head, imp1 [m]")
+    # insert_line(indent + "#head, imp1 [m]" + "\n" + indent + "plot.H" + impeller_number + " = plot.DPtt" + impeller_number + "/rho/9.81 \n" + indent + "#plot.H" + impeller_number + ":head, imp1 [m]")
     
     insert_line(indent + "#delta p (t-t), stage [Pa]" + "\n" + indent + "plot.DPtt_stage = flow.mpt@\"" \
         + CVs[stage_components[-1]] + "\" - flow.mpt@\"" + CVs[(stage_components[0] - 1)] + "\"\n" + indent + "#plot.DPtt_stage:delta p (t-t), stage [Pa]")
@@ -152,10 +152,12 @@ def get_Dicts(spro_file):
         for line in data:
             if "#plot." in line:
                 key = line.split(":")[0].split(".")[1].strip()
+                '''
                 if key == "DPtt" + impeller_number:
                     key = "DPtt_imp"
                 if key == "Eff_tt_" + impeller_number + "_i":
                     key = "Eff_tt_imp"
+                '''
                 units_Dict[key] = line.split(" ")[-1].strip() 
                 desc_Dict[key] = line.split("[")[0].split(":")[1].strip()
 

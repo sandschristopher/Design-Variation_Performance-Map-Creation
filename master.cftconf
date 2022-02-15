@@ -1,18 +1,18 @@
 [DesignVariation]
-	project_name = FTnq84
+	project_name = genesis_v1
 	run_design_variation = False
 	text_file_delimiter = ,
 
 [Simerics]
 	run_simerics = True
 	run_performance_map = True
-	rpm_data = relative
-	rpm_values = 0.75 1.00
+	rpm_data = absolute
+	rpm_values = 80000
 	flowrate_data = relative
-	flowrate_values = 0.50 1.00 1.50
+	flowrate_values = 0.50 0.75 1.00 1.25 1.50
 
 [steady]
-	avg_window = 10
+	avg_window = 50
 	
 [transient]
 	run_transient = True
