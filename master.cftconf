@@ -1,21 +1,25 @@
+[Project]
+	project_name = panthalassa
+
 [DesignVariation]
-	project_name = genesis_v1
-	run_design_variation = False
-	text_file_delimiter = ,
+	run_design_variation_bool = False
 
 [Simerics]
-	run_simerics = True
-	run_performance_map = True
-	rpm_data = absolute
-	rpm_values = 80000
-	flowrate_data = relative
-	flowrate_values = 0.50 0.75 1.00 1.25 1.50
+	run_simerics_bool = True
 
 [steady]
 	avg_window = 50
 	
 [transient]
-	run_transient = True
+	run_transient_bool = True
 	avg_window = 120
+
+[PerformanceMap]
+	run_performance_map_bool = True
+	rpm_type = relative
+	rpm_values = 1.50
+	flowrate_type = relative
+	flowrate_values = 1.00
+
 
 	
