@@ -1,547 +1,440 @@
-import shutil
+import pandas as pd
 import numpy as np
+import configparser
 import re
 import csv
 import os
-import configparser
 import subprocess
-from math import radians, pi
-import pandas as pd
-from modify_spro import *                                                       
+from math import degrees, radians, pi
+from modify_spro import *
 
-'''
-Takes .txt file filled with parameter values and converts it into a numpy array (column vector is one geometry variation).
-Dimensions should be in [m] and angles should be in [deg].
+def build_template(cft_batch_file, template_file):
 
-Inputs:
-txt_file [string] = name of .txt file containing geometry variation parameters
-delimeter [string] = delimiter used within .txt file to separate values
+    master = {}
 
-Outputs:
-values_array [np.array] = np.array of geometry parameter values
-'''
-def txt_to_np(txt_file, delimiter):
+    with open(cft_batch_file, 'r') as infile, open(template_file, 'w') as outfile:
+        data = infile.readlines()
+        for line_number1, line1 in enumerate(data):
+            if "<ExportComponents " in line1:
+                num_components = int(line1.split("\"")[1])
+                for index in range(1, num_components + 1):
+                    for line_number2, line2 in enumerate(data):
+                        component = re.search("Caption=\"(.+?)\"", data[line_number1 + index]).group(1)
+                        formatted_component = "".join(char for char in component if char.isalnum() or char in "_-")
+                        if formatted_component not in master:
+                            master[formatted_component] = {}
+                        if "Name=\"" + component in line2:
+                            book_end = line2.split(" ")[0].strip()[1:]
+                            for line_number3, line3 in enumerate(data):
+                                if "</" + book_end in line3:
+                                    section = data[line_number2:line_number3]
+                                    for line_number4, line4 in enumerate(section):
+                                        if "Caption=" in line4:
+                                            variable = line4.split(" ")[0].strip()[1:]
+                                            master[formatted_component][variable] = {}
 
-    array = []
+                                            try:
+                                                var_type = re.search("Type=\"(.+?)\"", line4).group(1)
+                                                master[formatted_component][variable]['var_type'] = var_type
+                                            except AttributeError:
+                                                next
 
-    with open(txt_file) as txt:
-        data = txt.readlines()
-        for line in data:
-            array.append(line.split(delimiter))
+                                            try:
+                                                count = re.search("Count=\"(.+?)\"", line4).group(1)
+                                                master[formatted_component][variable]['count'] = count
+                                            except AttributeError:
+                                                next
 
-    values_array = np.array(array, dtype=object)
+                                            try:
+                                                caption = re.search("Caption=\"(.+?)\"", line4).group(1)
+                                                master[formatted_component][variable]['caption'] = caption
+                                            except AttributeError:
+                                                next
+
+                                            try:
+                                                desc = re.search("Desc=\"(.+?)\"", line4).group(1)
+                                                master[formatted_component][variable]['desc'] = desc
+                                            except AttributeError:
+                                                next
+                                            
+                                            try:
+                                                unit = re.search("Unit=\"(.+?)\"", line4).group(1)
+                                                master[formatted_component][variable]['unit'] = unit
+                                            except AttributeError:
+                                                next
+
+                                            values = []
+                                            markers = []
+
+                                            if "<TMeanLine" in section[line_number4 - 1]:
+                                                index = int(re.search("Index=\"(.+?)\"", section[line_number4 - 1]).group(1)) + 1
+                                                value = float(re.search(">(.*)</", line4).group(1))
+                                                marker = "{" + formatted_component + "_" + variable + "_MeanLine" + str(index) + "}"
+
+                                                data[line_number2 + line_number4] = data[line_number2 + line_number4].replace(str(value), marker)
+                                                master[formatted_component][variable]['value'] = value
+                                                master[formatted_component][variable]['marker'] = marker
+
+                                            elif var_type == "Array1":
+                                                for line_number5, line5 in enumerate(section):
+                                                    if "</" + variable + ">" in line5:
+                                                        for line_number6, line6 in enumerate(section[(line_number4 + 1):line_number5]):
+                                                            try:
+                                                                index = line_number6 + 1
+                                                                value = float(re.search(">(.*)</", line6).group(1))
+                                                                marker = "{" + formatted_component + "_" + variable + "_MeanLine" + str(index) + "}"
+                                                                values.append(value)
+                                                                markers.append(marker)
+                                                            except AttributeError:
+                                                                next
+
+                                                            data[line_number2 + line_number4 + 1 + line_number6] = data[line_number2 + line_number4 + 1 + line_number6].replace(str(value), marker)
+                                                        
+                                                        master[formatted_component][variable]['value'] = values
+                                                        master[formatted_component][variable]['marker'] = markers
+                                            
+                                            elif var_type == "Vector2":
+                                                for line_number5, line5 in enumerate(section):
+                                                    if "</" + variable + ">" in line5:
+                                                        for line_number6, line6 in enumerate(section[(line_number4 + 1):line_number5]):
+                                                            try:
+                                                                coordinate = line6.split(" ")[0].strip()[1:]
+                                                                value = float(re.search(">(.*)</", line6).group(1))
+                                                                marker = "{" + formatted_component + "_" + variable + "_" + coordinate + "}"
+                                                                values.append(value)
+                                                                markers.append(marker)
+                                                            except AttributeError:
+                                                                next
+
+                                                            data[line_number2 + line_number4 + 1 + line_number6] = data[line_number2 + line_number4 + 1 + line_number6].replace(str(value), marker)
+                                                        
+                                                        master[formatted_component][variable]['value'] = values
+                                                        master[formatted_component][variable]['marker'] = markers
+
+                                            else:
+                                                try:
+                                                    if var_type == "Integer":
+                                                        value = int(re.search(">(.*)</", line4).group(1))
+                                                    else: 
+                                                        value = float(re.search(">(.*)</", line4).group(1))
+                                                    
+                                                    marker = "{" + formatted_component + "_" + variable + "}"
+                                                except AttributeError:
+                                                    next
+
+                                                data[line_number2 + line_number4] = data[line_number2 + line_number4].replace(str(value), marker)
+                                                
+                                                master[formatted_component][variable]['value'] = value
+                                                master[formatted_component][variable]['marker'] = marker
+
+        outfile.writelines(data)
+
+    simple = {}
+
+    for formatted_component in master.keys():
+        for variable in master[formatted_component].keys():
+            marker = master[formatted_component][variable].get('marker')
+            unit = master[formatted_component][variable].get('unit')
+            if type(marker) == str:
+                value = master[formatted_component][variable].get('value')
+                simple[marker] = (value, unit)
+            if type(marker) == list:
+                for index, item in enumerate(marker):
+                    value = master[formatted_component][variable].get('value')[index]
+                    simple[marker[index]] = (value, unit)
+
+    return master, simple
+
+
+def csv_to_np(simple, csv_file):
+
+    header = ["Design#"] + [marker[1:-1] for marker in simple.keys()]
+
+    first_row = [1] 
+    units_row = ['-']
+    
+    for (original, unit) in simple.values():
+        if unit == 'rad':
+            first_row.append(str(round(degrees(original), 3)))
+            units_row.append('deg')
+        elif unit == None:
+            first_row.append(str(original))
+            units_row.append('-')
+        else:
+            first_row.append(str(original))
+            units_row.append(unit)
+
+    if not os.path.exists(csv_file):
+        with open(csv_file, "w", newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow((header))
+            writer.writerow((units_row))
+            writer.writerow((first_row))
+            csvfile.close()
+
+        pause = input("Fill the CSV file with the design parameters. Once complete, press the <ENTER> key to continue.")
+    
+    values_array = (np.genfromtxt(csv_file, dtype=str, delimiter=',', skip_header=2).T)[1:]
 
     return values_array
 
 
-'''
-Takes original .cft-batch file and creates a blank .cft-batch template for parameter manipulation.
+def build_designs(project_name, solver_type, template_file, values_array, simple):
 
-Inputs:
-cft_batch_file [string] = name of original .cft-batch file exported from CFturbo software
-template_file [string] = name of output .cft-batch template 
+    designs = []
 
-Outputs:
-variables [list] = variable names associated with the manipulated geometry parameters
-units [list] = variable units associated with the manipulated geometry parameters
-components [list] = component names listed within the .cft-batch file
-'''
-def make_template(cft_batch_file, template_file):
+    for design_number, row in enumerate(values_array.T, start=1):
 
-    components = []
-    formatted_components = []
+        design_file = project_name + "_" + "Design" + str(design_number) + "_" + solver_type + ".cft-batch"
 
-    with open(cft_batch_file, "r") as cft_batch:
-        data = cft_batch.readlines()
-        for line_number, line in enumerate(data):
-            if "ExportComponents " in line:
-                num_components = int(line.split("\"")[1])
+        with open(template_file, 'r') as infile, open(design_file, 'w') as outfile:
+            data = infile.readlines()
 
-                for index in range(1, num_components + 1):
-                    component = data[line_number + index].split("\"")[3]
-                    components.append(component)
-                    
-                    if "[" in component:
-                        component = component.replace("[", " ").strip()
-                    
-                    if "]" in component:
-                        component = component.replace("]", " ").strip()
+            for value_number, (marker, (original, unit)) in enumerate(simple.items()):
+                for line_number, line in enumerate(data):        
+                    if marker in line:
+                        if unit == 'rad':
+                            data[line_number] = line.replace(marker, str(radians(float(row[value_number]))))
+                        else:
+                            data[line_number] = line.replace(marker, row[value_number])
 
-                    formatted_components.append(component)
-    
-        cft_batch.close()
+                    if "InputFile=" in line:
+                        old_InputFile = re.search("InputFile=\"(.*)\"", line).group(1)
+                        new_InputFile = ".\\" + project_name + "_" + solver_type + ".cft"
+                        data[line_number] = line.replace(old_InputFile, new_InputFile)
 
-    variables = []
+                    if "<WorkingDir>" in line:
+                        old_WorkingDir = re.search("<WorkingDir>(.*)</WorkingDir>", line).group(1)
+                        new_WorkingDir = ".\\"
+                        data[line_number] = line.replace(old_WorkingDir, new_WorkingDir)
+                            
+                    if "<BaseFileName>" in line:
+                        old_BaseFileName = re.search("<BaseFileName>(.*)</BaseFileName>", line).group(1)
+                        data[line_number] = line.replace(old_BaseFileName, design_file.replace(".cft-batch", ""))
+                        
+                    if "<OutputFile>" in line:
+                        old_OutputFile = re.search("<OutputFile>(.*)</OutputFile>", line).group(1)
+                        data[line_number] = line.replace(old_OutputFile, design_file.replace(".cft-batch", ".cft"))
 
-    with open(cft_batch_file, "r") as cft_batch:
-        data = cft_batch.readlines()
-        for line_number, line in enumerate(data):
-            if "Type=" in line and "</" in line and "ExportInterface" not in line and bool(set(line.split("\"")) & set(components)) == False:
-                value = re.search(">(.*)</", line).group(1)
-                variable = re.search("</(.*)>", line).group(1)
-                newline = line.replace(value, "{" + variable + "}")
-                data[line_number] = newline
-                variables.append(variable)
+            outfile.writelines(data)
 
-            if "ExportComponents " in line:
-                for index in range(0, num_components):
-                    newline = data[line_number + index + 1].replace(components[index], formatted_components[index])
-                    data[line_number + index + 1] = newline
-                break
+        designs.append(design_file)
 
-        cft_batch.close()
-    
-    with open(template_file, "w") as template:
-        template.writelines(data)
-        template.close()
+    return designs
 
-    units = []
 
-    with open(cft_batch_file, "r") as cft_batch:
-        data = cft_batch.readlines()
-        for line_number, line in enumerate(data):
-            if "Caption=" in line and "Desc=" in line:
-                if "Array" in line:
-                    unit = re.search("Unit=\"(.*)\"", line).group(1)
+def run_design_variation(designs):
 
-                    var = line.split(" ")[0].lstrip()[1:]
-                    key = "</" + var + ">"
-            
-                    count = 0
-                    while True:
-                        if key in data[(line_number + 1) + count]:
-                            break
-                        count += 1
+    spro_files = []
 
-                    units += [unit] * count 
+    for design in designs:
 
-                elif "Vector" in line:
-                    count = int(re.search("([\d])", line).group(1))
-                    unit = re.search("Unit=\"(.*)\"", line).group(1)
-                    units += [unit] * count 
+        spro_file = design.replace(".cft-batch", ".spro")
+        spro_files.append(spro_file)
 
-                elif "Unit" not in line:
-                    unit = "-"
-                    units.append(unit)
+        if not os.path.exists(design.replace(".cft-batch", ".log")):
 
-                else:
-                    unit = re.search("Unit=\"(.*)\"", line).group(1)
-                    units.append(unit)
-        
-        cft_batch.close()
-       
-    return variables, units, components
+            cfturbo_command = "\"C:\Program Files\CFturbo 2021.2.2\CFturbo.exe\" -batch \"" + design + "\"\n"
+            print("\n" + cfturbo_command + "\n")
+            subprocess.run(cfturbo_command)
 
-'''
-Assigns geometry variation parameters to new .cft-batch files.
+    return spro_files
 
-Inputs:
-cft_batch_file [string] = name of original .cft-batch file exported from CFturbo software
-template_file [string] = name of output .cft-batch template 
-variables [list] = variable names associated with the manipulated geometry parameters
-units [list] = variable units associated with the manipulated geometry parameters
-components [list] = component names listed within the .cft-batch file
-values_array [np.array] = np.array of geometry parameter values
-base_name [string] = base name of folder containing .stp files
+def run_performance_map(run_performance_map_bool, spro_files, stage_components, rpm_type, rpm_values, flowrate_type, flowrate_values):
 
-Outputs:
-variations [list] = list of variation file names
-'''
-def make_variations(cft_batch_file, template_file, variables, units, components, values_array, base_name):
+    spro_dicts = []
 
-    original_values = [[] for i in range(len(units))]
+    solver_index = 0
+    solver_switch = False
 
-    with open(cft_batch_file, "r") as cft_batch:
-        data = cft_batch.readlines()
-        count = 0
-        for line_number, line in enumerate(data):
-            if "Type=" in line and "</" in line and "ExportInterface" not in line and bool(set(line.split("\"")) & set(components)) == False:
-                value = re.search(">(.*)</", line).group(1)
-                original_values[count] = [value]
-                count += 1
+    for spro_file in spro_files:
 
-    original_values = np.array(original_values)
+        modify_spro(spro_file, stage_components)
 
-    variations = []
-
-    entire_values_array = np.hstack((original_values, values_array))
-
-    for i, column in enumerate(entire_values_array.T):
-
-        with open(template_file, "r") as template:
-            data = template.readlines()
-
-            for j, value in enumerate(column):
-
-                if units[j] == "rad" and i != 0:
-                    value = str(radians(float(value)))
-
-                key = "{" + variables[j] + "}"
-                 
-                for line_number, line in enumerate(data):
-                    if key in line:
-                        data[line_number] = line.replace(key, value)
-                        break
-
+        with open(spro_file, 'r') as infile:
+            data = infile.readlines()
             for line_number, line in enumerate(data):
-                '''
-                if "<WorkingDir>" in line:
-                    old_directory = re.search("<WorkingDir>(.*)</WorkingDir>", line).group(1)
-                    new_directory = ".\\" + output_folder + "\\"
-                    data[line_number] = line.replace(old_directory, new_directory)
-                '''
+                if "vflow_out = " in line:
+                    vflow_out_design = float(line.split("=")[1].strip())
+                if "#Angular velocity" in line:
+                    omega_design = float(data[line_number + 1].split("=")[1].strip())
+                    break
 
-                if "<BaseFileName>" in line:
-                    old_name = re.search("<BaseFileName>(.*)</BaseFileName>", line).group(1)
-                    solver_type = old_name.split("_")[-1]
-                    data[line_number] = line.replace(old_name, base_name + str(i) + "_" + solver_type)
+            infile.close()
 
-            new_file = base_name + str(i) + "_" + solver_type + ".cft-batch"
-
-            with open(new_file, "w+") as new:
-                new.writelines(data)
-                new.close()
-
-            template.close()
-
-        variations.append(new_file)
-
-    return variations
-
-
-'''
-Places each variation into a .bat file then runs .bat file to create respective .cft variations.
-
-Inputs:
-cft_batch_file [string] = output .bat file (CFturbo)
-variations [list] = variation file names
-
-Outputs:
-base_steady_spro_files [list] = list of base steady .spro files before performance map alterations to vflow_out and Omega
-base_transient_spro_files [list] = list of base steady .spro files before performance map alterations to vflow_out and Omega
-'''
-def make_batch(cft_bat_file, variations):
-
-    base_steady_spro_files = []
-    base_transient_spro_files = []
-    
-    with open(cft_bat_file, "a+") as batch:
-        for index, variation in enumerate(variations):
-            if index == 0:
-                batch.truncate(0)
-
-            batch.write("\"C:\Program Files\CFturbo 2021.2.0\CFturbo.exe\" -batch \"" + variation + "\"\n")
-            if "steady" in variation:
-                base_steady_spro_files.append(variation.replace(".cft-batch", ".spro"))
-            if "transient" in variation:
-                base_transient_spro_files.append(variation.replace(".cft-batch", ".spro"))
-
-        batch.close()
-
-    batch_path = os.path.abspath(cft_bat_file)
-    folder_path = os.path.abspath(variations[0].split("_")[0])
-    spro_path = os.path.abspath(variations[0].replace(".cft-batch", ".spro"))
-    if not os.path.exists(spro_path) and not os.path.exists(folder_path):
-        subprocess.call(batch_path)
-
-    return base_steady_spro_files, base_transient_spro_files
-
-'''
-Alters the .spro files of the design variations and creates multiple .spro files for a design performance map.
-
-Inputs:
-run_design_variation [string] = bool-type string that decides whether design variation will occur
-stage_components [list of int] = list of integers representing the inital and final stage components
-base_name [string] = base name of folder containing .stp files
-variations [list] = variation file names
-rpm_type [string]
-rpm_values [list]
-flowrate_type [string]
-flowrate_values [list]
-
-Outputs:
-steady_spro_files [list] = list of steady .spro files modified for performance map
-transient_spro_files [list] = list of transient .spro files modified for performance map
-'''
-def performance_map(run_design_variation, stage_components, base_name, variations, rpm_data, rpm_values, flowrate_data, flowrate_values):
-
-    already_run = False
-    volumetric = False
-    mass = False
-
-    steady_spro_files = []
-    transient_spro_files = []
-
-    parent_path = os.getcwd()
-
-    for file in os.listdir(parent_path):
-        if ".spro" in file and "rpm" not in file:
-            modify_spro(file, stage_components)
-            with open(file, 'r') as infile:
-                data = infile.readlines()
-                for line_number, line in enumerate(data):
-                    if "vflow_out = " in line:
-                        vflow_out_design = round(float(line.split(" ")[-1].strip()), 5)
-                        volumetric = True
-                        continue
-                    if "mflow = " in line:
-                        mflow_design = round(float(line.split(" ")[-1].strip()), 5)
-                        mass = True
-                        continue
-                    if "#Angular velocity" in line:
-                        omega_design = round(float(data[line_number + 1].split("=")[1]), 5)
-                    
-            if rpm_data.lower() == "relative":
+        if run_performance_map_bool.lower() == "true":
+            if rpm_type.lower() == "relative":
                 omega_list = [float(rpm_value)*omega_design for rpm_value in rpm_values]
                 rpm_list = [round(omega_value*(30/pi)) for omega_value in omega_list]
-            elif rpm_data.lower() == "absolute":
+            elif rpm_type.lower() == "absolute":
                 rpm_list = [round(float(rpm_value)) for rpm_value in rpm_values]
                 omega_list = [rpm_value/(30/pi) for rpm_value in rpm_list]
             else:
                 print("Please choose either relative or absolute for rpm_type.")
                 exit()
 
-            if flowrate_data.lower() == "relative":
-                if volumetric == True:
-                    flowrate_list = [round(float(flowrate_value)*vflow_out_design, 5) for flowrate_value in flowrate_values]
-                if mass == True:
-                    flowrate_list = [round(float(flowrate_value)*mflow_design, 5) for flowrate_value in flowrate_values]
-            elif flowrate_data.lower() == "absolute":
+            if flowrate_type.lower() == "relative":
+                flowrate_list = [round(float(flowrate_value)*vflow_out_design, 5) for flowrate_value in flowrate_values]
+            elif flowrate_type.lower() == "absolute":
                 flowrate_list = [float(flowrate_value) for flowrate_value in flowrate_values]
             else:
                 print("Please choose either relative or absolute for flowrate_type.")
                 exit()
+        else:
+            omega_list = [omega_design]
+            rpm_list = [round(omega_design*(30/pi))]
+            flowrate_list = [vflow_out_design]
 
-            for check in os.listdir(parent_path):
-                if str(flowrate_list[-1]) in check and str(round(rpm_list[-1]*9.54929)) in check and base_name + str(len(variations) - 1) in check:
-                    already_run = True
-
-            for index, omega in enumerate(omega_list):
-                for flowrate in flowrate_list:
-                    if volumetric == True:
-                        new_file = file.split(".")[0] + "_" + str(rpm_list[index]) + "rpm_" + str(flowrate).replace(".", "-") + "m3s.spro"
-                    if mass == True:
-                        new_file = file.split(".")[0] + "_" + str(rpm_list[index]) + "rpm_" + str(flowrate).replace(".", "-") + "kgs.spro"
-                    if already_run == False:
-                        with open(file, 'r') as infile, open(new_file, 'w') as outfile:
-                            data = infile.readlines() 
-                            for line_number, line in enumerate(data):                                                                                  
-                                if "vflow_out = " in line:
-                                    outfile.write("\t\t" + "vflow_out = " + str(flowrate) + "\n") 
-                                elif "mflow = " in line:
-                                    outfile.write("\t\t" + "mflow = " + str(flowrate) + "\n") 
-                                elif "#Angular velocity" in line:
-                                    impeller_number = re.search("Omega(\d) = ", data[line_number + 1]).group(1)
-                                    data[line_number + 1] = ""
-                                    outfile.write(line + "\t\t" + "Omega" + impeller_number + " = " + str(omega) + "\n")    
-                                else:
-                                    outfile.write(line)
-
-                    if "steady" in new_file:
-                        steady_spro_files.append(new_file)
-                    elif "transient" in new_file:
-                        transient_spro_files.append(new_file)   
-
-    if run_design_variation.lower() == "true":
-        steady_spro_files = sorted(steady_spro_files, key=lambda file: int(re.search(base_name + "(\d+)", file).group(1)))
-        transient_spro_files = sorted(transient_spro_files, key=lambda file: int(re.search(base_name + "(\d+)", file).group(1)))
-
-    return steady_spro_files, transient_spro_files
-
-
-'''
-Asks the user to input the integer numbers associated with the starting and ending stage components.
-Modifies the .spro files to include relevant user expressions for post-processing.
-Places each variation into a .bat file then runs .bat file using Simerics.
-
-Inputs:
-stage_components [list of int] = list of integers representing the inital and final stage components
-spro_steady_files [list]
-spro_transient_files [list]
-simerics_batch_file [string] = name of output .bat file (Simerics)
-output_folder [string] = name of output folder containing the resulting geometry variations
-base_name [string] = base name of folder containing .stp files
-
-Outputs:
-spro_files [list] = list of all .spro files ran within Simerics
-'''
-def run_simerics_batch(stage_components, steady_spro_files, transient_spro_files, run_transient, simerics_batch_file, base_name):
-
-    if os.path.exists(base_name + "0") == False and os.path.exists(steady_spro_files[0].replace(".spro", ".sres")) == False:
-
-        for spro in steady_spro_files:
-            modify_spro(spro, stage_components)
-
-            with open(simerics_batch_file, "a+") as batch:
-                for index, spro in enumerate(steady_spro_files):
-                    if index == 0:
-                        batch.truncate(0)
-                    
-                    batch.write("\"C:\Program Files\Simerics\SimericsMP.exe\" -run \"" + spro + "\"\n")
-
-                batch.close()
-
-        batch_path = os.path.abspath(simerics_batch_file)
-        subprocess.call(batch_path)
-
-    if run_transient.lower() == "true" and (os.path.exists(base_name + "0") == False and os.path.exists(transient_spro_files[0].replace(".spro", ".sres")) == False):
-
-        for spro in transient_spro_files:
-            modify_spro(spro, stage_components)
-
-            with open(simerics_batch_file, "a+") as batch:
-                for index, spro in enumerate(transient_spro_files):
-                    if index == 0:
-                        batch.truncate(0)
-
-                    batch.write("\"C:\Program Files\Simerics\SimericsMP.exe\" -run \"" + spro + "\" " + "\"" + steady_spro_files[index].replace(".spro", ".sres") + "\"\n")
-                    
-                batch.close()
-
-        batch_path = os.path.abspath(simerics_batch_file)
-        subprocess.call(batch_path)
-
-    return steady_spro_files + transient_spro_files
-
-'''
-Averages the each .sres file results and places the values in .csv file.
-
-Inputs:
-run_design_variation [string] = bool-type string that decides whether design variation will occur
-spro_files [list] = .spro files
-output_folder [string] = name of output folder containing the resulting geometry variations
-base_name [string] = base name of folder containing .stp files
-avgWindow [int] = number of iterations to calculate average values
-'''
-def post_process(run_design_variation, spro_files, base_name, steady_avg_window, transient_avg_window):
-
-    switch = False
-    volumetric = False
-    mass = False
-    index = 0
-    
-    for spro in spro_files:
-
-        impeller_numbers = []
-
-        if "transient" in spro and switch == False:
-            index = 0
-            switch = True
-
-        if run_design_variation.lower() == "true":
-            design_number = re.search(base_name + "(\d+)", spro).group(1)
-
-        if "steady" in spro:
+        if "steady" in spro_file:
             solver_type = "steady"
-            avgWindow = int(steady_avg_window)
-        if "transient" in spro:
+        elif "transient" in spro_file and solver_switch == False:
             solver_type = "transient"
-            avgWindow = int(transient_avg_window)
+            solver_index = 0
+            solver_switch = True
+        elif "transient" in spro_file and solver_switch == True:
+            solver_type = "transient"
 
-        with open (spro, 'r') as infile:
-            data = infile.readlines()
-            for line_number, line in enumerate(data):
-                if "vflow_out = " in line:
-                    vflow_out = float(line.split("=")[1])
-                    volumetric = True
-                    continue
-                if "mflow = " in line:
-                    mflow = float(line.split("=")[1])
-                    mass = True
-                    continue
-                if "#Angular velocity" in line:
-                    impeller_number = re.search("Omega(\d) = ", data[line_number + 1]).group(1)
-                    rpm = round(float(data[line_number + 1].split("=")[1])*9.5493)
+        for index, omega in enumerate(omega_list):
+            for flowrate in flowrate_list:
+                if run_performance_map_bool.lower() == "true":
+                    new_spro_file = spro_file.split(".")[0] + "_" + str(rpm_list[index]) + "rpm_" + str(flowrate).replace(".", "-") + "m3s.spro"
+                else:
+                    new_spro_file = spro_file
 
-        integral_file = spro.split(".")[0] + "_integrals.txt"
+                spro_dict = {
+                    'file_name': new_spro_file,
+                    'solver_type': solver_type,
+                    'solver_index': solver_index,
+                    'omega': omega,
+                    'rpm': rpm_list[index],
+                    'flowrate': flowrate
+                }
+                
+                if not os.path.exists(new_spro_file):
+                    with open(spro_file, 'r') as infile, open(new_spro_file, 'w') as outfile:
+                        data = infile.readlines()
+                        for line_number, line in enumerate(data):
+                            if "vflow_out = " in line:
+                                outfile.write("\t\t" + "vflow_out = " + str(flowrate) + "\n") 
+                            elif "#Angular velocity" in line:
+                                impeller_number = re.search("Omega(\d) = ", data[line_number + 1]).group(1)
+                                data[line_number + 1] = ""
+                                outfile.write(line + "\t\t" + "Omega" + impeller_number + " = " + str(omega) + "\n")    
+                            else:
+                                outfile.write(line)
+                
+                spro_dicts.append(spro_dict)
 
-        result_Dict = {}
-        formatted_result_Dict = {}
-        units_Dict, desc_Dict = get_Dicts(spro)
-        with open (integral_file, 'r') as infile:                                   
-            result_List = list(infile)                                                                  
-            del result_List[1:-avgWindow]                                  
-            reader = csv.DictReader(result_List, delimiter="\t")
-            for row in reader:
-                for key, value in row.items():
-                    if 'userdef.' in key:
-                        if key in result_Dict:
-                            try:                                                           
-                                result_Dict[key] += float(value)
-                            except ValueError:
-                                print("NaN for " + key + " in " + spro)
-                                continue
-                        else:
-                            try:
-                                result_Dict[key] = float(value)
-                            except ValueError:
-                                print("NaN for " + key + " in " + spro)
-                                continue
-            if run_design_variation.lower() == "true":
-                formatted_result_Dict[base_name] = design_number
-                units_Dict[base_name] = '-'
-                desc_Dict[base_name] = '-'
-            if volumetric == True:
-                formatted_result_Dict['vflow_out'] = vflow_out
-                units_Dict['vflow_out'] = '[m3/s]'
-                desc_Dict['vflow_out'] = 'Outlet volumetric flux'
-            if mass == True:
-                formatted_result_Dict['mflow'] = mflow
-                units_Dict['mflow'] = '[kg/s]'
-                desc_Dict['mflow'] = 'Mass flow'
-            formatted_result_Dict['Revolutions'] = rpm
-            units_Dict['Revolutions'] = '[rpm]'
-            desc_Dict['Revolutions'] = '-'
-            for key, value in result_Dict.items():
+                solver_index = solver_index + 1
+
+    return spro_dicts
+
+def post_process(project_name, spro_dict, steady_avg_window, transient_avg_window):
+
+    integrals_file = spro_dict.get('file_name').replace(".spro", "_integrals.txt")
+
+    units_dict, desc_dict = get_Dicts(spro_dict.get("file_name"))
+
+    if spro_dict.get('solver_type').lower() == "steady":
+        avg_window = int(steady_avg_window)
+    elif spro_dict.get('solver_type').lower() == "transient":
+        avg_window = int(transient_avg_window)
+
+    result_dict = {}
+
+    with open(integrals_file, 'r') as infile:
+        result_List = list(infile)                                                                  
+        del result_List[1:-avg_window]                                  
+        reader = csv.DictReader(result_List, delimiter="\t")
+        for row in reader:
+            for key, value in row.items():
                 if 'userdef.' in key:
-                    if "_i" in key:
-                        impeller_number = re.search("_(\d)_i", key).group(1)
-                        formatted_result_Dict[key[8:]] = result_Dict[key]/(avgWindow)
-                        if "Eff_tt" in key:
-                            impeller_numbers.append(impeller_number) 
+                    if key in result_dict:
+                        try:                                                           
+                            result_dict[key[8:]] += float(value)
+                        except ValueError:
+                            print("NaN for " + key + " in " + spro_dict.get('file_name'))
+                            continue
                     else:
-                        formatted_result_Dict[key[8:]] = result_Dict[key]/(avgWindow)
-        if volumetric == True:
-            if run_design_variation.lower() == "true":                              
-                order = [base_name, 'Revolutions', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
-            else:
-                order = ['Revolutions', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
-        if mass == True:
-            if run_design_variation.lower() == "true":                              
-                order = [base_name, 'Revolutions', 'mflow', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
-            else:
-                order = ['Revolutions', 'mflow', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
-        for number in impeller_numbers:
-            order.append('DPtt' + number)
-            order.append('Eff_tt_' + number + "_i")
-            order.append('PC' + number)
-            order.append('Torque' + number)
-        if len(impeller_numbers) > 1:
-            order.append('PC')
-            order.append('Torque')
-        for var in formatted_result_Dict.keys():
-            if var not in order:
-                order.append(var)
-        order_dict = {k: formatted_result_Dict[k] for k in order}
-        with open ('results_' + solver_type + '.csv', 'a+', newline='') as outfile:                             
-            writer = csv.DictWriter(outfile, fieldnames=order_dict.keys(), delimiter=",")             
-            if index == 0:                                                        
-                outfile.truncate(0)
-                writer.writeheader()
-                writer.writerow(units_Dict)
-                writer.writerow(desc_Dict)                                                                    
-            writer.writerow(formatted_result_Dict)
-        index = index + 1
+                        try:
+                            result_dict[key[8:]] = float(value)
+                        except ValueError:
+                            print("NaN for " + key[8:] + " in " + spro_dict.get('file_name'))
+                            continue
+
+        infile.close()
+
+    result_dict['rpm'] = spro_dict.get('rpm')
+    result_dict['omega'] = spro_dict.get('omega')
+    result_dict['vflow_out'] = spro_dict.get('vflow_out')
+
+    units_dict['rpm'] = 'rev/min'
+    units_dict['omega'] = 'rad/s'
+    units_dict['vflow_out'] = 'm3/s'
+
+    desc_dict['rpm'] = 'Revolutions per minute'
+    desc_dict['omega'] = 'Angular velocity'
+    desc_dict['vflow_out'] = 'Outlet volumetric flux'
+
+    order = ['rpm', 'omega', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
+
+    for key, value in desc_dict.items():
+        if "imp" in value and "delta p" in value:
+            order.append(key)
+        elif "imp" in value and "efficiency" in value:
+            order.append(key)
+        elif "imp" in value and "power" in value:
+            order.append(key)
+        elif "imp" in value and "torque" in value:
+            order.append(key)
+        elif "power" in value:
+            order.append(key)
+        elif "torque" in value:
+            order.append(key)
+
+    for key in result_dict.keys():
+        if key not in order:
+            order.append(key)
+
+    result_dict = {k: result_dict[k] for k in order}
+
+    with open (project_name + '_results_' + spro_dict.get("solver_type") + '.csv', 'a+', newline='') as outfile:                             
+        writer = csv.DictWriter(outfile, fieldnames=result_dict.keys(), delimiter=",")             
+        if spro_dict.get("solver_index") == 0:                                                        
+            outfile.truncate(0)
+            writer.writeheader()
+            writer.writerow(desc_dict)
+            writer.writerow(units_dict)                                                                    
+        writer.writerow(result_dict)
 
     return 0
 
 
-'''
-Takes the steady and transient .csv files created in post_process and places them in one .xlsx file.
+def run_simerics(project_name, spro_dicts, steady_avg_window, transient_avg_window):
 
-Inputs:
-project_name [string] = name of project
-'''
+    spro_files = [spro_dict.get('file_name').strip() for spro_dict in spro_dicts]  
+
+    for index, spro_file in enumerate(spro_files):
+        if not os.path.exists(spro_file.replace(".spro", ".sres")):
+            with open("simerics.bat", "w") as batch:
+                batch.truncate(0)
+                if "steady" in spro_file:
+                    simerics_command = "\"C:\Program Files\Simerics\SimericsMP.exe\" \"" + spro_file + "\" -saveAs \"" + spro_file.replace(".spro", "") + "\"\n" + "\"C:\Program Files\Simerics\SimericsMP.exe\" -run \"" + spro_file + "\""
+                    batch.write(simerics_command)
+            
+                elif "transient" in spro_file:
+                    simerics_command = "\"C:\Program Files\Simerics\SimericsMP.exe\" \"" + spro_file + "\" -saveAs \"" + spro_file.replace(".spro", "") + "\"\n" + "\"C:\Program Files\Simerics\SimericsMP.exe\" -run \"" + spro_file.replace("transient.spro", "steady.sres") + "\"\n"
+                    batch.write(simerics_command)
+
+                batch.close()
+
+            subprocess.call(os.path.abspath("simerics.bat"))
+        
+        post_process(project_name, spro_dicts[index], steady_avg_window, transient_avg_window)
+
+    return 0
+
+
 def combine_csv(project_name):
 
     parent_path = os.getcwd()
@@ -560,55 +453,6 @@ def combine_csv(project_name):
 
     return 0
 
-'''
-Organizes the files into folders based on design variations.
-
-Inputs:
-variations [list] = variation file names
-output_folder [string] = name of output folder containing the resulting geometry variations
-base_name [string] = base name of folder containing .stp files
-'''
-def organize_file_structure(run_design_variation, variations, base_name):
-
-    parent_path = os.getcwd()
-
-    if run_design_variation.lower() == "true":
-        for index in range(len(variations)):
-            for file in os.listdir(parent_path):
-                if base_name in file:
-                    if re.match(base_name + "(\d+)", file).group(1) == str(index) and not os.path.isdir(file) and "steady" in file:
-                        old_path = os.path.join(parent_path, file)
-                        design_folder = os.path.join(parent_path, base_name + str(index))
-                        if not os.path.exists(design_folder):
-                            os.makedirs(design_folder)
-                        steady_folder = os.path.join(design_folder, "steady")
-                        if not os.path.exists(steady_folder):
-                            os.makedirs(steady_folder)
-                        new_path = os.path.join(steady_folder, file)        
-                        shutil.move(old_path, new_path)
-                    
-                    if re.match(base_name + "(\d+)", file).group(1) == str(index) and not os.path.isdir(file) and "transient" in file:
-                        old_path = os.path.join(parent_path, file)
-                        design_folder = os.path.join(parent_path, base_name + str(index))
-                        if not os.path.exists(design_folder):
-                            os.makedirs(design_folder)
-                        steady_folder = os.path.join(design_folder, "transient")
-                        if not os.path.exists(steady_folder):
-                            os.makedirs(steady_folder)
-                        new_path = os.path.join(steady_folder, file)        
-                        shutil.move(old_path, new_path)
-    else:
-        for file in os.listdir(parent_path):
-            if "steady" in file:
-                old_path = os.path.join(parent_path, file)
-                steady_folder = os.path.join(parent_path, "steady")
-                if not os.path.exists(steady_folder):
-                    os.makedirs(steady_folder)
-                new_path = os.path.join(steady_folder, file)
-                shutil.move(old_path, new_path)
-         
-    return 0
-
 def main():
 
     stage_components = []
@@ -621,53 +465,40 @@ def main():
 
     CFconfig = configparser.ConfigParser()                                                             
     CFconfig.read("master.cftconf")
-    project_name = Get_ConfigValue("DesignVariation","project_name")
-    run_design_variation = Get_ConfigValue("DesignVariation","run_design_variation")  
-    delimiter = Get_ConfigValue("DesignVariation","text_file_delimiter")  
-    run_simerics = Get_ConfigValue("Simerics","run_simerics")
-    run_performance_map = Get_ConfigValue("Simerics","run_performance_map")
-    rpm_data = Get_ConfigValue("Simerics","rpm_data")
-    rpm_values = Get_ConfigValue("Simerics","rpm_values").split(" ") 
-    flowrate_data = Get_ConfigValue("Simerics","flowrate_data")
-    flowrate_values = Get_ConfigValue("Simerics","flowrate_values").split(" ") 
-    steady_avg_window = Get_ConfigValue("steady","avg_window")
-    run_transient = Get_ConfigValue("transient","run_transient")
-    transient_avg_window = Get_ConfigValue("transient","avg_window")
 
-    if run_design_variation.lower() == "true":
-        values_array = txt_to_np(project_name + ".txt", delimiter)
-        variables, units, components = make_template(project_name + "_steady.cft-batch", "template_steady.cft-batch")
-        variations = make_variations(project_name + "_steady.cft-batch", "template_steady.cft-batch", variables, units, components, values_array, "Design")
+    project_name = Get_ConfigValue("Project", "project_name")
+    run_design_variation_bool = Get_ConfigValue("DesignVariation", "run_design_variation_bool")
+    run_simerics_bool = Get_ConfigValue("Simerics", "run_simerics_bool")
+    steady_avg_window = Get_ConfigValue("steady", "avg_window")
+    run_transient_bool = Get_ConfigValue("transient", "run_transient_bool")
+    transient_avg_window = Get_ConfigValue("transient", "avg_window")
+    run_performance_map_bool = Get_ConfigValue("PerformanceMap", "run_performance_map_bool")
+    rpm_type = Get_ConfigValue("PerformanceMap", "rpm_type")
+    rpm_values = Get_ConfigValue("PerformanceMap", "rpm_values").split(" ") 
+    flowrate_type = Get_ConfigValue("PerformanceMap", "flowrate_type")
+    flowrate_values = Get_ConfigValue("PerformanceMap", "flowrate_values").split(" ") 
 
-        if run_transient.lower() == "true":
-            variables, units, components = make_template(project_name + "_transient.cft-batch", "template_transient.cft-batch")
-            variations = variations + make_variations(project_name + "_transient.cft-batch", "template_transient.cft-batch", variables, units, components, values_array, "Design")
+    if run_design_variation_bool.lower() == "true":
+        master, simple = build_template(project_name + "_steady.cft-batch", "template_steady.cft-batch")
+        values_array = csv_to_np(simple, project_name + "_design_parameters.csv")
+        designs = build_designs(project_name, "steady", "template_steady.cft-batch", values_array, simple)
+        spro_files = run_design_variation(designs)
 
-        base_steady_spro_files, base_transient_spro_files = make_batch(project_name + ".bat", variations)
-
-        if run_simerics.lower() == "true":
-            if run_performance_map.lower() == "true":
-                steady_spro_files, transient_spro_files = performance_map(run_design_variation, stage_components, "Design", variations, rpm_data, rpm_values, flowrate_data, flowrate_values)
-                spro_files = run_simerics_batch(stage_components, steady_spro_files, transient_spro_files, run_transient, project_name + "_simerics.bat", "Design")
-            else:
-                spro_files = run_simerics_batch(stage_components, base_steady_spro_files, base_transient_spro_files, run_transient, project_name + "_simerics.bat", "Design")
-
-            post_process(run_design_variation, spro_files, "Design", steady_avg_window, transient_avg_window)
-            combine_csv(project_name)
-            organize_file_structure(run_design_variation, variations, "Design")
-
-    elif run_design_variation.lower() == "false" and run_simerics.lower() == "true":
-        if run_performance_map.lower() == "true":
-            steady_spro_files, transient_spro_files = performance_map(run_design_variation, stage_components, "Design", project_name + ".spro", rpm_data, rpm_values, flowrate_data, flowrate_values)
-            spro_files = run_simerics_batch(stage_components, steady_spro_files, transient_spro_files, run_transient, project_name + "_simerics.bat", "Design")
-        else:
-            spro_files = run_simerics_batch(stage_components, project_name + "_steady.spro", project_name + "_transient.spro", run_transient, project_name + "_simerics.bat", "Design")
-
-        post_process(run_design_variation, spro_files, "Design", steady_avg_window, transient_avg_window)
-        combine_csv(project_name)
-        # organize_file_structure(run_design_variation, spro_files, "Design")
+        if run_transient_bool.lower() == "true":
+            master, simple = build_template(project_name + "_transient.cft-batch", "template_transient.cft-batch")
+            values_array = csv_to_np(simple, project_name + "_design_parameters.csv")
+            designs = build_designs(project_name, "transient", "template_transient.cft-batch", values_array, simple)
+            spro_files = spro_files + run_design_variation(designs)
 
     else:
-        exit()
+        spro_files = [project_name + "_steady.spro"]
+
+        if run_transient_bool.lower() == "true":
+            spro_files = spro_files + [project_name + "_steady.spro"]
+
+    if run_simerics_bool.lower() == "true":
+        spro_dicts = run_performance_map(run_performance_map_bool, spro_files, stage_components, rpm_type, rpm_values, flowrate_type, flowrate_values)
+        run_simerics(project_name, spro_dicts, steady_avg_window, transient_avg_window)
+        combine_csv(project_name)
 
 main()
