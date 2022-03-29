@@ -162,14 +162,14 @@ def modify_spro(spro_file, stage_components):
 def get_Dicts(spro_file):
 
     with open(spro_file, "r") as infile:
-        units_Dict = {}
-        desc_Dict = {}
+        units_dict = {}
+        desc_dict = {}
         data = infile.readlines()
         for line in data:
             if "#plot." in line:
                 key = line.split(":")[0].split(".")[1].strip()
-                units_Dict[key] = line.split(" ")[-1].strip() 
-                desc_Dict[key] = line.split("[")[0].split(":")[1].strip()
+                units_dict[key] = line.split(" ")[-1].strip() 
+                desc_dict[key] = line.split("[")[0].split(":")[1].strip()
 
-    return units_Dict, desc_Dict
+    return units_dict, desc_dict
 
