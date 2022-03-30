@@ -376,7 +376,7 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
     desc_dict['omega'] = 'Angular velocity'
     desc_dict['vflow_out'] = 'Outlet volumetric flux'
 
-    order = ['rpm', 'omega', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
+    order = ['rpm', 'omega', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage'] # 'Eff_tt_stage']
 
     for key, value in desc_dict.items():
         if "imp" in value and "delta p" in value:
@@ -494,7 +494,8 @@ def main():
         spro_files = [project_name + "_steady.spro"]
 
         if run_transient_bool.lower() == "true":
-            spro_files = spro_files + [project_name + "_steady.spro"]
+            spro_files = spro_files + [project_name + "_transient.spro"]
+            print(spro_files)
 
     if run_simerics_bool.lower() == "true":
         spro_dicts = run_performance_map(run_performance_map_bool, spro_files, stage_components, rpm_type, rpm_values, flowrate_type, flowrate_values)

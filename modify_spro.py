@@ -127,6 +127,15 @@ def modify_spro(spro_file, stage_components):
             + CVIs[i] + "\" - flow.p@\"" + CVIs[i - 1] + "\"\n" + indent + "#plot.DPtsCV" + str(i) + ":delta p (t-s), CV" \
             + str(i) + " [Pa]")
 
+        insert_line(indent + "#pressure (t), CVI" + str(i) + " [Pa]" + "\n" + indent + "plot.PtCVI" + str(i) + " = flow.mpt@\"" \
+            + CVIs[i] + "\"\n" + indent + "#plot.PtCVI" + str(i) + ":pressure (t), CVI" + str(i) + " [Pa]")
+
+        insert_line(indent + "#pressure (t), CVI" + str(i) + " [Pa]" + "\n" + indent + "plot.PtCVI" + str(i) + " = flow.mpt@\"" \
+            + CVIs[i] + "\"\n" + indent + "#plot.PtCVI" + str(i) + ":pressure (t), CVI" + str(i) + " [Pa]")
+
+        insert_line(indent + "#pressure (s), CVI" + str(i) + " [Pa]" + "\n" + indent + "plot.PsCVI" + str(i) + " = flow.p@\"" \
+            + CVIs[i] + "\"\n" + indent + "#plot.PsCVI" + str(i) + ":pressure (s), CVI" + str(i) + " [Pa]")
+
     if leakage_interface != 0:
 
         insert_line(indent + "#mass flow, shroud leakage, relative [-]" + "\n" + indent + "plot.mShroudLeakageRel = (flow.q@\"" \
@@ -172,4 +181,3 @@ def get_Dicts(spro_file):
                 desc_dict[key] = line.split("[")[0].split(":")[1].strip()
 
     return units_dict, desc_dict
-
