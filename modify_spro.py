@@ -130,9 +130,6 @@ def modify_spro(spro_file, stage_components):
         insert_line(indent + "#pressure (t), CVI" + str(i) + " [Pa]" + "\n" + indent + "plot.PtCVI" + str(i) + " = flow.mpt@\"" \
             + CVIs[i] + "\"\n" + indent + "#plot.PtCVI" + str(i) + ":pressure (t), CVI" + str(i) + " [Pa]")
 
-        insert_line(indent + "#pressure (t), CVI" + str(i) + " [Pa]" + "\n" + indent + "plot.PtCVI" + str(i) + " = flow.mpt@\"" \
-            + CVIs[i] + "\"\n" + indent + "#plot.PtCVI" + str(i) + ":pressure (t), CVI" + str(i) + " [Pa]")
-
         insert_line(indent + "#pressure (s), CVI" + str(i) + " [Pa]" + "\n" + indent + "plot.PsCVI" + str(i) + " = flow.p@\"" \
             + CVIs[i] + "\"\n" + indent + "#plot.PsCVI" + str(i) + ":pressure (s), CVI" + str(i) + " [Pa]")
 
