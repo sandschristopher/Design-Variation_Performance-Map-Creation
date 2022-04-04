@@ -248,6 +248,17 @@ def run_performance_map(run_performance_map_bool, spro_files, stage_components, 
     solver_switch = False
 
     for spro_file in spro_files:
+        if not os.path.exists(spro_file.replace(".spro", ".sgrd")):
+            with open("simerics.bat", "w") as batch:
+                batch.truncate(0)
+                simerics_command = "\"C:\Program Files\Simerics\SimericsMP.exe\" \"" + spro_file + "\" -saveAs \"" + spro_file.replace(".spro", "") + "\"\n"
+                batch.write(simerics_command)
+
+                batch.close()
+
+            subprocess.call(os.path.abspath("simerics.bat"))
+
+    for spro_file in spro_files:
 
         modify_spro(spro_file, stage_components)
 
@@ -376,7 +387,7 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
     desc_dict['omega'] = 'Angular velocity'
     desc_dict['vflow_out'] = 'Outlet volumetric flux'
 
-    order = ['rpm', 'omega', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage'] # 'Eff_tt_stage']
+    order = ['rpm', 'omega', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
 
     for key, value in desc_dict.items():
         if "imp" in value and "delta p" in value:
@@ -419,11 +430,11 @@ def run_simerics(project_name, spro_dicts, steady_avg_window, transient_avg_wind
             with open("simerics.bat", "w") as batch:
                 batch.truncate(0)
                 if "steady" in spro_file:
-                    simerics_command = "\"C:\Program Files\Simerics\SimericsMP.exe\" \"" + spro_file + "\" -saveAs \"" + spro_file.replace(".spro", "") + "\"\n" + "\"C:\Program Files\Simerics\SimericsMP.exe\" -run \"" + spro_file + "\""
+                    simerics_command = "\"C:\Program Files\Simerics\SimericsMP.exe\" -run \"" + spro_file + "\""
                     batch.write(simerics_command)
             
                 elif "transient" in spro_file:
-                    simerics_command = "\"C:\Program Files\Simerics\SimericsMP.exe\" \"" + spro_file + "\" -saveAs \"" + spro_file.replace(".spro", "") + "\"\n" + "\"C:\Program Files\Simerics\SimericsMP.exe\" -run \"" + spro_file.replace("transient.spro", "steady.sres") + "\"\n"
+                    simerics_command = "\"C:\Program Files\Simerics\SimericsMP.exe\" -run \"" + spro_file.replace("transient.spro", "steady.sres") + "\"\n"
                     batch.write(simerics_command)
 
                 batch.close()
