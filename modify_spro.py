@@ -1,7 +1,24 @@
 from re import search
 from itertools import chain
 
-def modify_spro(spro_file, stage_components):
+def modify_spro(spro_file):
+
+    # Gets volumes:
+    volumes = []
+    with open(spro_file, 'r') as infile:
+        data = infile.readlines()
+        for line_number, line in enumerate(data):
+            if "vc volume=" in line:
+                volumes.append(line.split("\"")[1])
+
+    volumes =  list(dict.fromkeys(volumes)) 
+
+    for index, volume in enumerate(volumes, start=1):
+        print("\n" + str(index) + ": " + volume)
+
+    stage_components = []
+    stage_components.append(int(input("\nEnter the number associated with the initial stage component: ")))
+    stage_components.append(int(input("Enter the number associated with the final stage component: ")))
 
     # Gets patch names for each componenet:
     patches = []
@@ -20,8 +37,9 @@ def modify_spro(spro_file, stage_components):
     # Gets the mismatched grid interface names:
     MGIs = []
     with open(spro_file, 'r') as infile:
-        for line in infile.readlines():
-            if "patch=\"MGI" in line:
+        data = infile.readlines()
+        for line_number, line in enumerate(data):
+            if "<bc patch=\"MGI" in line:
                 MGIs.append(line.strip().split("\"")[1])
 
     # Gets the interface names for each control volume:
@@ -121,10 +139,6 @@ def modify_spro(spro_file, stage_components):
     for i in range(1, len(CVIs)):
         insert_line(indent + "#delta p (t-t), CV" + str(i) + " [Pa]" + "\n" + indent + "plot.DPttCV" + str(i) + " = flow.mpt@\"" \
             + CVIs[i] + "\" - flow.mpt@\"" + CVIs[i - 1] + "\"\n" + indent + "#plot.DPttCV" + str(i) + ":delta p (t-t), CV" \
-            + str(i) + " [Pa]")
-
-        insert_line(indent + "#delta p (t-s), CV" + str(i) + " [Pa]" + "\n" + indent + "plot.DPtsCV" + str(i) + " = flow.p@\"" \
-            + CVIs[i] + "\" - flow.p@\"" + CVIs[i - 1] + "\"\n" + indent + "#plot.DPtsCV" + str(i) + ":delta p (t-s), CV" \
             + str(i) + " [Pa]")
 
         insert_line(indent + "#pressure (t), CVI" + str(i) + " [Pa]" + "\n" + indent + "plot.PtCVI" + str(i) + " = flow.mpt@\"" \
