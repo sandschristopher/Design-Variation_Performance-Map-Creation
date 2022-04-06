@@ -1,7 +1,7 @@
 from re import search
 from itertools import chain
 
-def modify_spro(spro_file):
+def get_stage_components(spro_file):
 
     # Gets volumes:
     volumes = []
@@ -19,6 +19,10 @@ def modify_spro(spro_file):
     stage_components = []
     stage_components.append(int(input("\nEnter the number associated with the initial stage component: ")))
     stage_components.append(int(input("Enter the number associated with the final stage component: ")))
+
+    return stage_components
+
+def modify_spro(spro_file, stage_components):
 
     # Gets patch names for each componenet:
     patches = []
