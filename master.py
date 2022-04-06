@@ -318,7 +318,7 @@ def run_performance_map(run_performance_map_bool, spro_files, stage_components, 
                     'solver_index': solver_index,
                     'omega': omega,
                     'rpm': rpm_list[index],
-                    'flowrate': flowrate
+                    'vflow_out': flowrate
                 }
                 
                 if not os.path.exists(new_spro_file):
@@ -391,7 +391,6 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
         order = ['rpm', 'omega', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
     else:
         order = ['rpm', 'omega', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage']
-
 
     for key, value in desc_dict.items():
         if "imp" in value and "delta p" in value:
