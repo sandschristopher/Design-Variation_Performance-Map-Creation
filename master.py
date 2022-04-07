@@ -379,9 +379,9 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
     result_dict['omega'] = spro_dict.get('omega')
     result_dict['vflow_out'] = spro_dict.get('vflow_out')
 
-    units_dict['rpm'] = 'rev/min'
-    units_dict['omega'] = 'rad/s'
-    units_dict['vflow_out'] = 'm3/s'
+    units_dict['rpm'] = '[rev/min]'
+    units_dict['omega'] = '[rad/s]'
+    units_dict['vflow_out'] = '[m3/s]'
 
     desc_dict['rpm'] = 'Revolutions per minute'
     desc_dict['omega'] = 'Angular velocity'
