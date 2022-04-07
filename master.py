@@ -397,11 +397,15 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
             order.append(key)
         elif "imp" in value and "efficiency" in value:
             order.append(key)
-        elif "imp" in value and "power" in value:
+
+    for key, value in desc_dict.items():
+        if "imp" in value and "power" in value:
             order.append(key)
         elif "imp" in value and "torque" in value:
             order.append(key)
-        elif "power" in value:
+
+    for key, value in desc_dict.items():
+        if "power" in value:
             order.append(key)
         elif "torque" in value:
             order.append(key)
