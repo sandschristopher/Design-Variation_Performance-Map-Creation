@@ -1,28 +1,41 @@
 from re import search
 from itertools import chain
+from tracemalloc import start
+import inflect
 
 def get_stage_components(spro_file):
+
+    p = inflect.engine()
 
     # Gets volumes:
     volumes = []
     with open(spro_file, 'r') as infile:
         data = infile.readlines()
-        for line_number, line in enumerate(data):
+        for line in data:
             if "vc volume=" in line:
                 volumes.append(line.split("\"")[1])
 
     volumes =  list(dict.fromkeys(volumes)) 
 
-    for index, volume in enumerate(volumes, start=1):
-        print("\n" + str(index) + ": " + volume)
+    CV_num = int(input("How many control volumes would you like to analyze: "))
 
-    stage_components = []
-    stage_components.append(int(input("\nEnter the number associated with the initial stage component: ")))
-    stage_components.append(int(input("Enter the number associated with the final stage component: ")))
+    CV_stage_components = []
 
-    return stage_components
+    if CV_num != 0:
+        for CV_index in range(CV_num):
+            for volume_index, volume in enumerate(volumes, start=1):
+                print("\n" + str(volume_index) + ": " + volume)
 
-def modify_spro(spro_file, stage_components):
+            stage_components = []
+            stage_components.append(int(input("\nEnter the number associated with the initial component of the " + str(p.ordinal(CV_index + 1)) + " CV: ")))
+            stage_components.append(int(input("\nEnter the number associated with the final component of the " + str(p.ordinal(CV_index + 1)) + " CV: ")))
+            CV_stage_components.append(stage_components)
+
+        return CV_stage_components
+    else:
+        return 0
+
+def modify_spro(spro_file, CV_stage_components):
 
     # Gets patch names for each componenet:
     patches = []
@@ -51,8 +64,15 @@ def modify_spro(spro_file, stage_components):
     with open(spro_file, 'r') as infile:
         for line in infile.readlines():
             if "plot.DPtt = " in line:
-                CVIs.insert(0, line.split("\"")[3])
-                CVIs.append(line.split("\"")[1])
+                final = line.split("\"")[3]
+                initial = line.split("\"")[1]
+    
+    if "Inflow" in final:
+        CVIs.insert(0, final)
+        CVIs.append(initial)
+    else:
+        CVIs.insert(0, initial)
+        CVIs.append(final)
 
     # Gets name/number associated with impellers:
     impellers = []
@@ -63,24 +83,6 @@ def modify_spro(spro_file, stage_components):
                 impeller_number = search("#plot.PC(\d)", line).group(1)
                 impeller_name = data[line_number - 1].split("\"")[1].split("-")[0]
                 impellers.append((impeller_name, impeller_number))
-
-    stage_patches = list(chain(*patches[(stage_components[0] - 1):(stage_components[-1] + 1)]))
-
-    stage_power_components = []
-
-    for patch in stage_patches[1:-1]:
-        for impeller in impellers:
-            if impeller[0] in patch:
-                stage_power_components.append("plot.PC" + impeller[1])
-
-    stage_power_components = list(set(stage_power_components))
-    
-    if len(stage_power_components) == 0:
-        stage_power = False
-    elif len(stage_power_components) == 1:
-        stage_power = stage_power_components[0]
-    else:
-        stage_power = " + ".join(stage_power_components)
 
     # Gets the indentation of each expression:
     with open(spro_file, 'r') as infile:
@@ -133,23 +135,45 @@ def modify_spro(spro_file, stage_components):
 
     insert_line(indent + "#head [m]" + "\n" + indent + "plot.H = plot.DPtt/rho/9.81 \n" + indent + "#plot.H:head [m]")
 
-    insert_line(indent + "#delta p (t-t), stage [Pa]" + "\n" + indent + "plot.DPtt_stage = flow.mpt@\"" \
-        + CVIs[stage_components[-1]] + "\" - flow.mpt@\"" + CVIs[(stage_components[0] - 1)] + "\"\n" + indent + "#plot.DPtt_stage:delta p (t-t), stage [Pa]")
-    
-    if stage_power != False:
-        insert_line(indent + "#efficiency (t-t), stage [-]" + "\n" + indent + "plot.Eff_tt_stage = flow.q@\"" \
-            + CVIs[stage_components[-1]] + "\"*plot.DPtt_stage/rho/(" + stage_power + ")\n" + indent + "#plot.Eff_tt_stage:efficiency (t-t), stage [-]")
+    if CV_stage_components != 0:
+        for CV_index, stage_components in enumerate(CV_stage_components, start=1):
+
+            stage_patches = list(chain(*patches[(stage_components[0] - 1):(stage_components[-1] + 1)]))
+
+            stage_power_components = []
+
+            for patch in stage_patches[1:-1]:
+                for impeller in impellers:
+                    if impeller[0] in patch:
+                        stage_power_components.append("plot.PC" + impeller[1])
+
+            stage_power_components = list(set(stage_power_components))
+            
+            if len(stage_power_components) == 0:
+                stage_power = False
+            elif len(stage_power_components) == 1:
+                stage_power = stage_power_components[0]
+            else:
+                stage_power = " + ".join(stage_power_components)
+
+            insert_line(indent + "#delta p (t-t), stage" + str(CV_index) + " [Pa]" + "\n" + indent + "plot.DPtt_stage" + str(CV_index) + " = flow.mpt@\"" \
+                + CVIs[stage_components[-1]] + "\" - flow.mpt@\"" + CVIs[(stage_components[0] - 1)] + "\"\n" + indent + "#plot.DPtt_stage" + str(CV_index) + ":delta p (t-t), stage" + str(CV_index) + " [Pa]")
+            
+            if stage_power != False:
+                insert_line(indent + "#efficiency (t-t), stage" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_stage" + str(CV_index) + " = flow.q@\"" \
+                    + CVIs[stage_components[-1]] + "\"*plot.DPtt_stage" + str(CV_index) + "/rho/(" + stage_power + ")\n" + indent + "#plot.Eff_tt_stage" + str(CV_index) + ":efficiency (t-t), stage" + str(CV_index) + " [-]")
 
     for i in range(1, len(CVIs)):
         insert_line(indent + "#delta p (t-t), CV" + str(i) + " [Pa]" + "\n" + indent + "plot.DPttCV" + str(i) + " = flow.mpt@\"" \
             + CVIs[i] + "\" - flow.mpt@\"" + CVIs[i - 1] + "\"\n" + indent + "#plot.DPttCV" + str(i) + ":delta p (t-t), CV" \
             + str(i) + " [Pa]")
 
+    for i, CVI in enumerate(CVIs):
         insert_line(indent + "#pressure (t), CVI" + str(i) + " [Pa]" + "\n" + indent + "plot.PtCVI" + str(i) + " = flow.mpt@\"" \
-            + CVIs[i] + "\"\n" + indent + "#plot.PtCVI" + str(i) + ":pressure (t), CVI" + str(i) + " [Pa]")
+            + CVI + "\"\n" + indent + "#plot.PtCVI" + str(i) + ":pressure (t), CVI" + str(i) + " [Pa]")
 
         insert_line(indent + "#pressure (s), CVI" + str(i) + " [Pa]" + "\n" + indent + "plot.PsCVI" + str(i) + " = flow.p@\"" \
-            + CVIs[i] + "\"\n" + indent + "#plot.PsCVI" + str(i) + ":pressure (s), CVI" + str(i) + " [Pa]")
+            + CVI + "\"\n" + indent + "#plot.PsCVI" + str(i) + ":pressure (s), CVI" + str(i) + " [Pa]")
 
     if leakage_interface != 0:
 

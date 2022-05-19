@@ -1,5 +1,5 @@
 [Project]
-	project_name = panthalassa
+	project_name = FT_Optimized_Design20
 
 [DesignVariation]
 	run_design_variation_bool = False
@@ -17,9 +17,6 @@
 [PerformanceMap]
 	run_performance_map_bool = True
 	rpm_type = relative
-	rpm_values = 1.50
-	flowrate_type = relative
-	flowrate_values = 1.00
-
-
-	
+	rpm_values = 1.00
+	flowrate_type = absolute
+	flowrate_values = 3.8975

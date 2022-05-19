@@ -240,7 +240,7 @@ def run_design_variation(designs):
 
     return spro_files
 
-def run_performance_map(run_performance_map_bool, spro_files, stage_components, rpm_type, rpm_values, flowrate_type, flowrate_values):
+def run_performance_map(run_performance_map_bool, spro_files, CV_stage_components, rpm_type, rpm_values, flowrate_type, flowrate_values):
 
     spro_dicts = []
 
@@ -260,7 +260,7 @@ def run_performance_map(run_performance_map_bool, spro_files, stage_components, 
 
     for spro_file in spro_files:
 
-        modify_spro(spro_file, stage_components)
+        modify_spro(spro_file, CV_stage_components)
 
         with open(spro_file, 'r') as infile:
             data = infile.readlines()
@@ -387,27 +387,27 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
     desc_dict['omega'] = 'Angular velocity'
     desc_dict['vflow_out'] = 'Outlet volumetric flux'
 
-    if 'Eff_tt_stage' in units_dict.keys():
-        order = ['rpm', 'omega', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage', 'Eff_tt_stage']
-    else:
-        order = ['rpm', 'omega', 'vflow_out', 'DPtt', 'Eff_tt', 'DPtt_stage']
+    stage_keys = []
+
+    for key in units_dict.keys():
+        if "stage" in key:
+            stage_keys.append(key)
+
+    stage_keys = sorted(stage_keys, key=lambda x:(x[-1], x))
+
+    order = ['rpm', 'omega', 'vflow_out', 'DPtt', 'Eff_tt'] + stage_keys
 
     for key, value in desc_dict.items():
         if "imp" in value and "delta p" in value:
             order.append(key)
-        elif "imp" in value and "efficiency" in value:
-            order.append(key)
-
+            order.append("Eff_tt_" + key[-1] + "_i")
+            order.append("PC" + key[-1])
+            order.append("Torque" + key[-1])
+    
     for key, value in desc_dict.items():
-        if "imp" in value and "power" in value:
+        if "power" in value and key not in order:
             order.append(key)
-        elif "imp" in value and "torque" in value:
-            order.append(key)
-
-    for key, value in desc_dict.items():
-        if "power" in value:
-            order.append(key)
-        elif "torque" in value:
+        elif "torque" in value and key not in order:
             order.append(key)
 
     for key in result_dict.keys():
@@ -510,10 +510,10 @@ def main():
         if run_transient_bool.lower() == "true":
             spro_files = spro_files + [project_name + "_transient.spro"]
 
-    stage_components = get_stage_components(spro_files[0])
+    CV_stage_components = get_stage_components(spro_files[0])
 
     if run_simerics_bool.lower() == "true":
-        spro_dicts = run_performance_map(run_performance_map_bool, spro_files, stage_components, rpm_type, rpm_values, flowrate_type, flowrate_values)
+        spro_dicts = run_performance_map(run_performance_map_bool, spro_files, CV_stage_components, rpm_type, rpm_values, flowrate_type, flowrate_values)
         run_simerics(project_name, spro_dicts, steady_avg_window, transient_avg_window)
         combine_csv(project_name)
 
