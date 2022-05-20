@@ -359,19 +359,20 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
         reader = csv.DictReader(result_List, delimiter="\t")
         for row in reader:
             for key, value in row.items():
-                if 'userdef.' in key:
-                    if key in result_dict:
-                        try:                                                           
-                            result_dict[key[8:]] += float(value)
-                        except ValueError:
-                            print("NaN for " + key + " in " + spro_dict.get('file_name'))
-                            continue
-                    else:
-                        try:
-                            result_dict[key[8:]] = float(value)
-                        except ValueError:
-                            print("NaN for " + key[8:] + " in " + spro_dict.get('file_name'))
-                            continue
+                if key is not None:
+                    if 'userdef.' in key:
+                        if key in result_dict:
+                            try:                                                           
+                                result_dict[key[8:]] += float(value)
+                            except ValueError:
+                                print("NaN for " + key + " in " + spro_dict.get('file_name'))
+                                continue
+                        else:
+                            try:
+                                result_dict[key[8:]] = float(value)
+                            except ValueError:
+                                print("NaN for " + key[8:] + " in " + spro_dict.get('file_name'))
+                                continue
 
         infile.close()
 
