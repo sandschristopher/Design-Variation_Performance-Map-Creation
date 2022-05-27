@@ -434,7 +434,7 @@ def run_simerics(project_name, spro_dicts, steady_avg_window, transient_avg_wind
     spro_files = [spro_dict.get('file_name').strip() for spro_dict in spro_dicts]  
 
     for index, spro_file in enumerate(spro_files):
-        if not os.path.exists(spro_file.replace(".spro", ".sres")):
+        if ("steady" in spro_file and not os.path.exists(spro_file.replace(".spro", ".sres"))) or ("transient" in spro_file and not os.path.exists(spro_file.replace(".spro", "_integrals.txt"))):
             with open("simerics.bat", "w") as batch:
                 batch.truncate(0)
                 if "steady" in spro_file:
