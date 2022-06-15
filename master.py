@@ -261,40 +261,50 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
     for spro_file in spro_files:
 
         modify_spro(spro_file, CV_stage_components)
-
-        with open(spro_file, 'r') as infile:
-            data = infile.readlines()
-            for line_number, line in enumerate(data):
-                if "vflow_out = " in line:
-                    vflow_out_design = float(line.split("=")[1].strip())
-                if "#Angular velocity" in line:
-                    omega_design = float(data[line_number + 1].split("=")[1].strip())
-                    break
-
-            infile.close()
+        [(vflow_out_design_value), (omega_design_value, omega_design_units)] = get_design_point(spro_file)
 
         if run_performance_map_bool.lower() == "true":
-            if rpm_type.lower() == "relative":
-                omega_list = [float(rpm_value)*omega_design for rpm_value in rpm_values]
-                rpm_list = [round(omega_value*(30/pi)) for omega_value in omega_list]
-            elif rpm_type.lower() == "absolute":
-                rpm_list = [round(float(rpm_value)) for rpm_value in rpm_values]
-                omega_list = [rpm_value/(30/pi) for rpm_value in rpm_list]
-            else:
-                print("Please choose either relative or absolute for rpm_type.")
-                exit()
+            if omega_design_units.lower() == "rad/s":
+                if rpm_type.lower() == "relative":
+                    omega_list = [float(rpm_value)*omega_design_value for rpm_value in rpm_values]
+                    rpm_list = [round(omega_value*(30/pi)) for omega_value in omega_list]
+                elif rpm_type.lower() == "absolute":
+                    rpm_list = [round(float(rpm_value)) for rpm_value in rpm_values]
+                    omega_list = [rpm_value/(30/pi) for rpm_value in rpm_list]
+                else:
+                    print("Please choose either relative or absolute for rpm_type.")
+                    exit()
+                values_list = omega_list
+            elif omega_design_units.lower() == "rpm":
+                if rpm_type.lower() == "relative":
+                    rpm_list = [float(rpm_value)*omega_design_value for rpm_value in rpm_values]
+                    omega_list = [round(rpm_value*(pi/30), 5) for rpm_value in rpm_list]
+                elif rpm_type.lower() == "absolute":
+                    rpm_list = [round(float(rpm_value)) for rpm_value in rpm_values]
+                    omega_list = [rpm_value/(30/pi) for rpm_value in rpm_list]
+                else:
+                    print("Please choose either relative or absolute for rpm_type.")
+                    exit()
+                values_list = rpm_list
 
             if flowrate_type.lower() == "relative":
-                flowrate_list = [round(float(flowrate_value)*vflow_out_design, 5) for flowrate_value in flowrate_values]
+                flowrate_list = [round(float(flowrate_value)*vflow_out_design_value, 5) for flowrate_value in flowrate_values]
             elif flowrate_type.lower() == "absolute":
                 flowrate_list = [float(flowrate_value) for flowrate_value in flowrate_values]
             else:
                 print("Please choose either relative or absolute for flowrate_type.")
                 exit()
         else:
-            omega_list = [omega_design]
-            rpm_list = [round(omega_design*(30/pi))]
-            flowrate_list = [vflow_out_design]
+            if omega_design_units.lower() == "rad/s":
+                omega_list = [omega_design_value]
+                rpm_list = [round(omega_design_value*(30/pi))]
+                flowrate_list = [vflow_out_design_value]
+                values_list = omega_list
+            elif omega_design_units.lower() == "rpm":
+                rpm_list = [omega_design_value]
+                omega_list = [round(omega_design_value*(pi/30), 5)]
+                flowrate_list = [vflow_out_design_value]
+                values_list = rpm_list
 
         if "steady" in spro_file:
             solver_type = "steady"
@@ -305,7 +315,7 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
         elif "transient" in spro_file and solver_switch == True:
             solver_type = "transient"
 
-        for index, omega in enumerate(omega_list):
+        for index, value in enumerate(values_list):
             for flowrate in flowrate_list:
                 if run_performance_map_bool.lower() == "true":
                     new_spro_file = spro_file.split(".")[0] + "_" + str(rpm_list[index]) + "rpm_" + str(flowrate).replace(".", "-") + "m3s.spro"
@@ -316,7 +326,8 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
                     'file_name': new_spro_file,
                     'solver_type': solver_type,
                     'solver_index': solver_index,
-                    'omega': omega,
+                    'value': value,
+                    'omega': omega_list[index],
                     'rpm': rpm_list[index],
                     'vflow_out': flowrate
                 }
@@ -330,7 +341,7 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
                             elif "#Angular velocity" in line:
                                 impeller_number = re.search("Omega(\d) = ", data[line_number + 1]).group(1)
                                 data[line_number + 1] = ""
-                                outfile.write(line + "\t\t" + "Omega" + impeller_number + " = " + str(omega) + "\n")    
+                                outfile.write(line + "\t\t" + "Omega" + impeller_number + " = " + str(value) + "\n")    
                             else:
                                 outfile.write(line)
                 

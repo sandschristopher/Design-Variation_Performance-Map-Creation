@@ -220,3 +220,25 @@ def get_Dicts(spro_file):
                 desc_dict[key] = line.split("[")[0].split(":")[1].strip()
 
     return units_dict, desc_dict
+
+def get_design_point(spro_file):
+
+    with open(spro_file, 'r') as infile:
+        data = infile.readlines()
+        for line_number, line in enumerate(data):
+            if "vflow_out = " in line:
+                vflow_out_design_value = float(line.split("=")[1].strip())
+
+            if "#Angular velocity" in line and "[" in line:
+                omega_design_value = float(data[line_number + 1].split("=")[1].strip())
+                omega_design_units = line.split("[")[1].strip()[:-1]
+                break
+
+            if "#Angular velocity" in line and "(" in line:
+                omega_design_value = float(data[line_number + 1].split("=")[1].strip())
+                omega_design_units = line.split("(")[1].strip()[:-1]
+                break
+        
+        infile.close()
+
+    return [(vflow_out_design_value), (omega_design_value, omega_design_units)]
