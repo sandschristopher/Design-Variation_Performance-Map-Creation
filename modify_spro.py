@@ -79,7 +79,7 @@ def modify_spro(spro_file, CV_stage_components):
     with open(spro_file, 'r') as infile:
         data = infile.readlines()
         for line_number, line in enumerate(data):
-            if "#plot.PC" in line and "imp" in line:
+            if "#plot.PC" in line and "imp" in line or "#plot.PC" in line and "Imp" in line:
                 impeller_number = search("#plot.PC(\d)", line).group(1)
                 impeller_name = data[line_number - 1].split("\"")[1].split("-")[0]
                 impellers.append((impeller_name, impeller_number))
