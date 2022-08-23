@@ -163,11 +163,6 @@ def modify_spro(spro_file, CV_stage_components):
                 insert_line(indent + "#efficiency (t-t), stage" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_stage" + str(CV_index) + " = flow.q@\"" \
                     + CVIs[stage_components[-1]] + "\"*plot.DPtt_stage" + str(CV_index) + "/rho/(" + stage_power + ")\n" + indent + "#plot.Eff_tt_stage" + str(CV_index) + ":efficiency (t-t), stage" + str(CV_index) + " [-]")
 
-    for i in range(1, len(CVIs)):
-        insert_line(indent + "#delta p (t-t), CV" + str(i) + " [Pa]" + "\n" + indent + "plot.DPttCV" + str(i) + " = flow.mpt@\"" \
-            + CVIs[i] + "\" - flow.mpt@\"" + CVIs[i - 1] + "\"\n" + indent + "#plot.DPttCV" + str(i) + ":delta p (t-t), CV" \
-            + str(i) + " [Pa]")
-
     for i, CVI in enumerate(CVIs):
         insert_line(indent + "#pressure (t), CVI" + str(i) + " [Pa]" + "\n" + indent + "plot.PtCVI" + str(i) + " = flow.mpt@\"" \
             + CVI + "\"\n" + indent + "#plot.PtCVI" + str(i) + ":pressure (t), CVI" + str(i) + " [Pa]")
