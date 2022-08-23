@@ -117,7 +117,7 @@ def modify_spro(spro_file, CV_stage_components):
         with open(spro_file, 'r') as infile:
             data = infile.readlines()
             for line_number, line in enumerate(data):
-                if addition.split("\n")[0].strip() in line:
+                if addition.split("\n")[1].split("=")[1].strip() in line:
                     exists_already = True
                     
         if exists_already == False:
@@ -161,6 +161,11 @@ def modify_spro(spro_file, CV_stage_components):
             if stage_power != False:
                 insert_line(indent + "#efficiency (t-t), stage" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_stage" + str(CV_index) + " = flow.q@\"" \
                     + CVIs[stage_components[-1]] + "\"*plot.DPtt_stage" + str(CV_index) + "/rho/(" + stage_power + ")\n" + indent + "#plot.Eff_tt_stage" + str(CV_index) + ":efficiency (t-t), stage" + str(CV_index) + " [-]")
+
+    for i in range(1, len(CVIs)):
+        insert_line(indent + "#delta p (t-t), CV" + str(i) + " [Pa]" + "\n" + indent + "plot.DPttCV" + str(i) + " = flow.mpt@\"" \
+            + CVIs[i] + "\" - flow.mpt@\"" + CVIs[i - 1] + "\"\n" + indent + "#plot.DPttCV" + str(i) + ":delta p (t-t), CV" \
+            + str(i) + " [Pa]")
 
     for i, CVI in enumerate(CVIs):
         insert_line(indent + "#pressure (t), CVI" + str(i) + " [Pa]" + "\n" + indent + "plot.PtCVI" + str(i) + " = flow.mpt@\"" \
