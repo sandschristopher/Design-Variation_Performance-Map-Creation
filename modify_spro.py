@@ -1,6 +1,5 @@
 from re import search
 from itertools import chain
-from tracemalloc import start
 import inflect
 
 def get_stage_components(spro_file):
