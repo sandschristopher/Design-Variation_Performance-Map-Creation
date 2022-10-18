@@ -409,17 +409,20 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
 
     order = ['rpm', 'omega', 'vflow_out', 'DPtt', 'Eff_tt'] + stage_keys
 
+
     for key, value in desc_dict.items():
-        if "imp" in value and "delta p" in value:
+        if "imp" in value.lower() and "delta p" in value and "passage" not in value:
+            print(key, value)
             order.append(key)
             order.append("Eff_tt_" + key[-1] + "_i")
             order.append("PC" + key[-1])
             order.append("Torque" + key[-1])
+            print(order)
     
     for key, value in desc_dict.items():
-        if "power" in value and key not in order:
+        if "power" in value and "passage" not in value and key not in order:
             order.append(key)
-        elif "torque" in value and key not in order:
+        elif "torque" in value and "passage" not in value and key not in order:
             order.append(key)
 
     for key in result_dict.keys():
