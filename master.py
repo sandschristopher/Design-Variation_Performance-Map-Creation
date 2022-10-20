@@ -318,7 +318,7 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
         for index, value in enumerate(values_list):
             for flowrate in flowrate_list:
                 if run_performance_map_bool.lower() == "true":
-                    new_spro_file = spro_file.split(".")[0] + "_" + str(rpm_list[index]) + "rpm_" + str(flowrate).replace(".", "-") + "m3s.spro"
+                    new_spro_file = spro_file.split(".")[0] + "_" + str(rpm_list[index]).replace(".", "-") + "rpm_" + str(flowrate).replace(".", "-") + "m3s.spro"
                 else:
                     new_spro_file = spro_file
 
