@@ -223,7 +223,7 @@ def build_designs(project_name, solver_type, template_file, values_array, simple
     return designs
 
 
-def run_design_variation(designs):
+def run_design_variation(designs, cft_version):
 
     spro_files = []
 
@@ -234,7 +234,7 @@ def run_design_variation(designs):
 
         if not os.path.exists(design.replace(".cft-batch", ".log")):
 
-            cfturbo_command = "\"C:\Program Files\CFturbo 2021.2.2\CFturbo.exe\" -batch \"" + design + "\"\n"
+            cfturbo_command = "\"C:\Program Files\CFturbo " + cft_version + "\CFturbo.exe\" -batch \"" + design + "\"\n"
             print("\n" + cfturbo_command + "\n")
             subprocess.run(cfturbo_command)
 
@@ -495,6 +495,7 @@ def main():
 
     project_name = Get_ConfigValue("Project", "project_name")
     run_design_variation_bool = Get_ConfigValue("DesignVariation", "run_design_variation_bool")
+    cft_version = Get_ConfigValue("DesignVariation", "cft_version")
     run_simerics_bool = Get_ConfigValue("Simerics", "run_simerics_bool")
     steady_avg_window = Get_ConfigValue("steady", "avg_window")
     run_transient_bool = Get_ConfigValue("transient", "run_transient_bool")
@@ -509,13 +510,13 @@ def main():
         master, simple = build_template(project_name + "_steady.cft-batch", "template_steady.cft-batch")
         values_array = csv_to_np(simple, project_name + "_design_parameters.csv")
         designs = build_designs(project_name, "steady", "template_steady.cft-batch", values_array, simple)
-        spro_files = run_design_variation(designs)
+        spro_files = run_design_variation(designs, cft_version)
 
         if run_transient_bool.lower() == "true":
             master, simple = build_template(project_name + "_transient.cft-batch", "template_transient.cft-batch")
             values_array = csv_to_np(simple, project_name + "_design_parameters.csv")
             designs = build_designs(project_name, "transient", "template_transient.cft-batch", values_array, simple)
-            spro_files = spro_files + run_design_variation(designs)
+            spro_files = spro_files + run_design_variation(designs, cft_version)
 
     else:
         spro_files = [project_name + "_steady.spro"]

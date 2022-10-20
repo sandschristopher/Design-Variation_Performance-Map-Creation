@@ -1,22 +1,23 @@
 [Project]
-	project_name = FT_Optimized_Design20
+	project_name = 19c_rotor_trial2
 
 [DesignVariation]
-	run_design_variation_bool = False
+	run_design_variation_bool = True
+	cft_version = 2022.1.2
 
 [Simerics]
-	run_simerics_bool = True
+	run_simerics_bool = False
 
 [steady]
 	avg_window = 50
 	
 [transient]
-	run_transient_bool = True
+	run_transient_bool = False
 	avg_window = 120
 
 [PerformanceMap]
-	run_performance_map_bool = True
-	rpm_type = relative
-	rpm_values = 1.00
-	flowrate_type = absolute
-	flowrate_values = 3.8975
+	run_performance_map_bool = False
+	rpm_type = absolute
+	rpm_values = 5000
+	flowrate_type = relative
+	flowrate_values = 1.00
