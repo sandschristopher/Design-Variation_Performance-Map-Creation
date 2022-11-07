@@ -109,16 +109,29 @@ def modify_spro(spro_file, CV_stage_components):
     with open(spro_file, 'w') as outfile:
         data = "".join(data)
         outfile.write(data)
+
+    '''
+    This is incorrect.
+    '''
     
     def insert_line(addition):
+
+        with open(spro_file, 'r') as infile:
+            data = infile.readlines()
+            for line_number, line in enumerate(data):
+                if "<expressions>" in line:
+                    domain_start = line_number + 1
+                if "</expressions>" in line:
+                    domain_end = line_number
 
         exists_already = False
 
         with open(spro_file, 'r') as infile:
             data = infile.readlines()
-            for line_number, line in enumerate(data):
-                if addition.split("\n")[1].split("=")[1].strip() in line:
-                    exists_already = True
+            for line_number, line in enumerate(data[domain_start:domain_end]):
+                if "=" in line:
+                    if addition.split("\n")[1].split("=")[1].strip() == line.split("=")[1].strip():
+                        exists_already = True
                     
         if exists_already == False:
             with open(spro_file, 'r') as infile:
@@ -156,7 +169,7 @@ def modify_spro(spro_file, CV_stage_components):
                 stage_power = " + ".join(stage_power_components)
 
             insert_line(indent + "#delta p (t-t), stage" + str(CV_index) + " [Pa]" + "\n" + indent + "plot.DPtt_stage" + str(CV_index) + " = flow.mpt@\"" \
-                + CVIs[stage_components[-1]] + "\" - flow.mpt@\"" + CVIs[(stage_components[0] - 1)] + "\"\n" + indent + "#plot.DPtt_stage" + str(CV_index) + ":delta p (t-t), stage" + str(CV_index) + " [Pa]")
+                + CVIs[stage_components[-1]] + "\"-flow.mpt@\"" + CVIs[(stage_components[0] - 1)] + "\"\n" + indent + "#plot.DPtt_stage" + str(CV_index) + ":delta p (t-t), stage" + str(CV_index) + " [Pa]")
             
             if stage_power != False:
                 insert_line(indent + "#efficiency (t-t), stage" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_stage" + str(CV_index) + " = flow.q@\"" \
@@ -164,7 +177,7 @@ def modify_spro(spro_file, CV_stage_components):
 
     for i in range(1, len(CVIs)):
         insert_line(indent + "#delta p (t-t), CV" + str(i) + " [Pa]" + "\n" + indent + "plot.DPttCV" + str(i) + " = flow.mpt@\"" \
-            + CVIs[i] + "\" - flow.mpt@\"" + CVIs[i - 1] + "\"\n" + indent + "#plot.DPttCV" + str(i) + ":delta p (t-t), CV" \
+            + CVIs[i] + "\"-flow.mpt@\"" + CVIs[i - 1] + "\"\n" + indent + "#plot.DPttCV" + str(i) + ":delta p (t-t), CV" \
             + str(i) + " [Pa]")
 
     for i, CVI in enumerate(CVIs):
