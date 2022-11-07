@@ -109,10 +109,6 @@ def modify_spro(spro_file, CV_stage_components):
     with open(spro_file, 'w') as outfile:
         data = "".join(data)
         outfile.write(data)
-
-    '''
-    This is incorrect.
-    '''
     
     def insert_line(addition):
 
