@@ -109,6 +109,8 @@ def modify_spro(spro_file, CV_stage_components):
     with open(spro_file, 'w') as outfile:
         data = "".join(data)
         outfile.write(data)
+
+    # Adds new, nonduplicate expression to .spro file:
     
     def insert_line(addition):
 
