@@ -16,7 +16,7 @@ def get_stage_components(spro_file):
 
     volumes =  list(dict.fromkeys(volumes)) 
 
-    CV_num = int(input("How many control volumes would you like to analyze: "))
+    CV_num = int(input("\nThe export from CFturbo to SimericsMP automatically creates expressions to calculate the total pressure difference and total efficiency of the entire device (inlet of first component to outlet of the final component) by default, but it might be pertinent to analyze a subsect control volume within the entire device.\n\nHow many subsect control volumes would you like to analyze: "))
 
     CV_stage_components = []
 
