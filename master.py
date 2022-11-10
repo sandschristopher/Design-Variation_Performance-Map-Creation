@@ -200,7 +200,7 @@ def build_designs(project_name, solver_type, template_file, values_array, simple
 
                     if "InputFile=" in line:
                         old_InputFile = re.search("InputFile=\"(.*)\"", line).group(1)
-                        new_InputFile = ".\\" + project_name + "_" + solver_type + ".cft"
+                        new_InputFile = ".\\" + project_name + ".cft"
                         data[line_number] = line.replace(old_InputFile, new_InputFile)
 
                     if "<WorkingDir>" in line:
