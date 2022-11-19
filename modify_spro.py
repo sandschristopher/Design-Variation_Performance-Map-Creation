@@ -241,12 +241,12 @@ def get_design_point(spro_file):
 
             if "#Angular velocity" in line and "[" in line:
                 omega_design_value = float(data[line_number + 1].split("=")[1].strip())
-                omega_design_units = line.split("[")[1].strip()[:-1]
+                omega_design_units = line.split("[")[-1].strip()[:-1]
                 break
 
             if "#Angular velocity" in line and "(" in line:
                 omega_design_value = float(data[line_number + 1].split("=")[1].strip())
-                omega_design_units = line.split("(")[1].strip()[:-1]
+                omega_design_units = line.split("(")[-1].strip()[:-1]
                 break
         
         infile.close()
