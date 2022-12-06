@@ -365,27 +365,30 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
     result_dict = {}
 
     with open(integrals_file, 'r') as infile:
-        result_List = list(infile)                                                                  
-        del result_List[1:-avg_window]                                  
+        result_List = list(infile)                                                              
+        del result_List[1:-avg_window]                      
         reader = csv.DictReader(result_List, delimiter="\t")
         for row in reader:
             for key, value in row.items():
                 if key is not None:
                     if 'userdef.' in key:
-                        if key in result_dict:
-                            try:                                                           
-                                result_dict[key[8:]] += float(value)
-                            except ValueError:
-                                print("NaN for " + key + " in " + spro_dict.get('file_name'))
-                                continue
-                        else:
+                        if key[8:] not in result_dict:
                             try:
                                 result_dict[key[8:]] = float(value)
                             except ValueError:
                                 print("NaN for " + key[8:] + " in " + spro_dict.get('file_name'))
                                 continue
+                        else:
+                            try:                                                       
+                                result_dict[key[8:]] += float(value)
+                            except ValueError:
+                                print("NaN for " + key + " in " + spro_dict.get('file_name'))
+                                continue
 
         infile.close()
+
+    for key, value in result_dict.items():
+        result_dict[key] = value/avg_window
 
     result_dict['rpm'] = spro_dict.get('rpm')
     result_dict['omega'] = spro_dict.get('omega')
