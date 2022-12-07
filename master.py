@@ -17,9 +17,9 @@ def build_template(cft_batch_file, template_file):
         for line_number1, line1 in enumerate(data):
             if "<ExportComponents " in line1:
                 num_components = int(line1.split("\"")[1])
-                for index in range(1, num_components + 1):
+                for component_index in range(1, num_components + 1):
                     for line_number2, line2 in enumerate(data):
-                        component = re.search("Caption=\"(.+?)\"", data[line_number1 + index]).group(1)
+                        component = re.search("Caption=\"(.+?)\"", data[line_number1 + component_index]).group(1)
                         formatted_component = "".join(char for char in component if char.isalnum() or char in "_-")
                         if formatted_component not in master:
                             master[formatted_component] = {}
@@ -92,6 +92,9 @@ def build_template(cft_batch_file, template_file):
                                                         
                                                         master[formatted_component][variable]['value'] = values
                                                         master[formatted_component][variable]['marker'] = markers
+
+                                                        print(master)
+                                                        print("\n")
                                             
                                             elif var_type == "Vector2":
                                                 for line_number5, line5 in enumerate(section):
