@@ -92,9 +92,6 @@ def build_template(cft_batch_file, template_file):
                                                         
                                                         master[formatted_component][variable]['value'] = values
                                                         master[formatted_component][variable]['marker'] = markers
-
-                                                        print(master)
-                                                        print("\n")
                                             
                                             elif var_type == "Vector2":
                                                 for line_number5, line5 in enumerate(section):
