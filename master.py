@@ -113,11 +113,12 @@ def build_template(cft_batch_file, template_file):
 
                                             else:
                                                 try:
-                                                    if var_type == "Integer":
-                                                        value = int(re.search(">(.*)</", line4).group(1))
-                                                    else: 
-                                                        value = float(re.search(">(.*)</", line4).group(1))
-                                                    
+                                                    value = re.search(">(.*)</", line4).group(1)
+                                                    if "." in value:
+                                                        value = float(value)
+                                                    else:
+                                                        value = int(value)
+
                                                     marker = "{" + formatted_component + "_" + variable + "}"
                                                 except AttributeError:
                                                     next
