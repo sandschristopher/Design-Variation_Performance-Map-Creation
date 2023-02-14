@@ -8,6 +8,11 @@ import subprocess
 from math import degrees, radians, pi
 from modify_spro import *
 
+'''
+Use "rotor" to delete head expresison
+
+'''
+
 def build_template(cft_batch_file, template_file):
 
     master = {}
@@ -262,7 +267,7 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
     for spro_file in spro_files:
 
         modify_spro(spro_file, CV_stage_components)
-        [(vflow_out_design_value), (omega_design_value, omega_design_units)] = get_design_point(spro_file)
+        [(flow_out_design_value), (omega_design_value, omega_design_units)], isMassFlow = get_design_point(spro_file)
 
         if run_performance_map_bool.lower() == "true":
             if omega_design_units.lower() == "rad/s":
@@ -289,7 +294,7 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
                 values_list = rpm_list
 
             if flowrate_type.lower() == "relative":
-                flowrate_list = [round(float(flowrate_value)*vflow_out_design_value, 5) for flowrate_value in flowrate_values]
+                flowrate_list = [round(float(flowrate_value)*flow_out_design_value, 5) for flowrate_value in flowrate_values]
             elif flowrate_type.lower() == "absolute":
                 flowrate_list = [float(flowrate_value) for flowrate_value in flowrate_values]
             else:
@@ -299,12 +304,12 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
             if omega_design_units.lower() == "rad/s":
                 omega_list = [omega_design_value]
                 rpm_list = [round(omega_design_value*(30/pi))]
-                flowrate_list = [vflow_out_design_value]
+                flowrate_list = [flow_out_design_value]
                 values_list = omega_list
             elif omega_design_units.lower() == "rpm":
                 rpm_list = [omega_design_value]
                 omega_list = [round(omega_design_value*(pi/30), 5)]
-                flowrate_list = [vflow_out_design_value]
+                flowrate_list = [flow_out_design_value]
                 values_list = rpm_list
 
         if "steady" in spro_file:
@@ -319,7 +324,10 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
         for index, value in enumerate(values_list):
             for flowrate in flowrate_list:
                 if run_performance_map_bool.lower() == "true":
-                    new_spro_file = spro_file.split(".")[0] + "_" + str(rpm_list[index]).replace(".", "-") + "rpm_" + str(flowrate).replace(".", "-") + "m3s.spro"
+                    if isMassFlow == False:
+                        new_spro_file = spro_file.split(".")[0] + "_" + str(rpm_list[index]).replace(".", "-") + "rpm_" + str(flowrate).replace(".", "-") + "m3s.spro"
+                    else:
+                        new_spro_file = spro_file.split(".")[0] + "_" + str(rpm_list[index]).replace(".", "-") + "rpm_" + str(flowrate).replace(".", "-") + "kgs.spro"
                 else:
                     new_spro_file = spro_file
 
@@ -330,7 +338,7 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
                     'value': value,
                     'omega': omega_list[index],
                     'rpm': rpm_list[index],
-                    'vflow_out': flowrate
+                    'flow_out': flowrate
                 }
                 
                 if not os.path.exists(new_spro_file):
@@ -338,7 +346,9 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
                         data = infile.readlines()
                         for line_number, line in enumerate(data):
                             if "vflow_out = " in line:
-                                outfile.write("\t\t" + "vflow_out = " + str(flowrate) + "\n") 
+                                outfile.write("\t\t" + "vflow_out = " + str(flowrate) + "\n")
+                            elif "mflow = " in line:
+                                outfile.write("\t\t" + "mflow = " + str(flowrate) + "\n")
                             elif "#Angular velocity" in line:
                                 impeller_number = re.search("Omega(\d) = ", data[line_number + 1]).group(1)
                                 data[line_number + 1] = ""
@@ -356,7 +366,7 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
 
     integrals_file = spro_dict.get('file_name').replace(".spro", "_integrals.txt")
 
-    units_dict, desc_dict = get_Dicts(spro_dict.get("file_name"))
+    units_dict, desc_dict, isMassFlow = get_Dicts(spro_dict.get("file_name"))
 
     if spro_dict.get('solver_type').lower() == "steady":
         avg_window = int(steady_avg_window)
@@ -393,15 +403,20 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
 
     result_dict['rpm'] = spro_dict.get('rpm')
     result_dict['omega'] = spro_dict.get('omega')
-    result_dict['vflow_out'] = spro_dict.get('vflow_out')
+    result_dict['flow_out'] = spro_dict.get('flow_out')
 
     units_dict['rpm'] = '[rev/min]'
     units_dict['omega'] = '[rad/s]'
-    units_dict['vflow_out'] = '[m3/s]'
 
     desc_dict['rpm'] = 'Revolutions per minute'
     desc_dict['omega'] = 'Angular velocity'
-    desc_dict['vflow_out'] = 'Outlet volumetric flux'
+
+    if isMassFlow == False:
+        desc_dict['flow_out'] = 'Outlet volumetric flux'
+        units_dict['flow_out'] = '[m3/s]'
+    else:
+        desc_dict['flow_out'] = 'Outlet mass flux'
+        units_dict['flow_out'] = '[kg/s]'
 
     stage_keys = []
 
@@ -411,7 +426,7 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
 
     stage_keys = sorted(stage_keys, key=lambda x:(x[-1], x))
 
-    order = ['rpm', 'omega', 'vflow_out', 'DPtt', 'Eff_tt'] + stage_keys
+    order = ['rpm', 'omega', 'flow_out', 'DPtt', 'Eff_tt'] + stage_keys
 
     for key, value in desc_dict.items():
         if "imp" in value.lower() and "delta p" in value and "passage" not in value:

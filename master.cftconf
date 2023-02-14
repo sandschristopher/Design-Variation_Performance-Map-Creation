@@ -1,23 +1,23 @@
 [Project]
-	project_name = 19c_rotor_trial2
+	project_name = axial_compressor_v5
 
 [DesignVariation]
-	run_design_variation_bool = True
-	cft_version = 2022.1.2
+	run_design_variation_bool = False
+	cft_version = 2022.2.2
 
 [Simerics]
-	run_simerics_bool = False
+	run_simerics_bool = True
 
 [steady]
 	avg_window = 50
 	
 [transient]
-	run_transient_bool = False
+	run_transient_bool = True
 	avg_window = 120
 
 [PerformanceMap]
-	run_performance_map_bool = False
+	run_performance_map_bool = True
 	rpm_type = absolute
-	rpm_values = 5000
-	flowrate_type = relative
-	flowrate_values = 1.00
+	rpm_values = 5000 7000
+	flowrate_type = absolute
+	flowrate_values = 7 8.25 9.5 10.75 12 13.25 14.5 15.75 16.375 17
