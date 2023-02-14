@@ -1,6 +1,5 @@
 [Project]
-	project_name = axial_compressor_v5
-
+	project_name = project_name
 [DesignVariation]
 	run_design_variation_bool = False
 	cft_version = 2022.2.2
@@ -18,6 +17,6 @@
 [PerformanceMap]
 	run_performance_map_bool = True
 	rpm_type = absolute
-	rpm_values = 5000 7000
-	flowrate_type = absolute
-	flowrate_values = 7 8.25 9.5 10.75 12 13.25 14.5 15.75 16.375 17
+	rpm_values = 5000 6000 7000
+	flowrate_type = relative
+	flowrate_values = 0.50 0.75 1.00 1.25 1.50
