@@ -8,11 +8,6 @@ import subprocess
 from math import degrees, radians, pi
 from modify_spro import *
 
-'''
-Use "rotor" to delete head expresison
-
-'''
-
 def build_template(cft_batch_file, template_file):
 
     master = {}
