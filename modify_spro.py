@@ -73,16 +73,21 @@ def modify_spro(spro_file, CV_stage_components):
         CVIs.insert(0, initial)
         CVIs.append(final)
 
-    # Gets name/number associated with impellers:
-    impellers = []
+    # Gets name/number associated with rotating machinery:
+    turbos = []
     with open(spro_file, 'r') as infile:
         data = infile.readlines()
         for line_number, line in enumerate(data):
-            if "#plot.PC" in line and "imp" in line or "#plot.PC" in line and "Imp" in line:
-                impeller_number = search("#plot.PC(\d)", line).group(1)
-                impeller_name = data[line_number - 1].split("\"")[1].split("-")[0]
-                impellers.append((impeller_name, impeller_number))
+            if "#power" in line:
+                try:
+                    turbo_number = search("plot.PC(\d)", data[line_number + 1].split("=")[0]).group(1)
+                    if turbo_number is not None:
+                        turbo_name = data[line_number + 1].split("\"")[1].split("-")[0]
+                        turbos.append((turbo_name, turbo_number))
 
+                except AttributeError:
+                    continue
+                
     # Gets the indentation of each expression:
     with open(spro_file, 'r') as infile:
         for line in infile.readlines():
@@ -111,7 +116,6 @@ def modify_spro(spro_file, CV_stage_components):
         outfile.write(data)
 
     # Adds new, nonduplicate expression to .spro file:
-    
     def insert_line(addition):
 
         with open(spro_file, 'r') as infile:
@@ -153,9 +157,9 @@ def modify_spro(spro_file, CV_stage_components):
             stage_power_components = []
 
             for patch in stage_patches[1:-1]:
-                for impeller in impellers:
-                    if impeller[0] in patch:
-                        stage_power_components.append("plot.PC" + impeller[1])
+                for turbo in turbos:
+                    if turbo[0] in patch:
+                        stage_power_components.append("plot.PC" + turbo[1])
 
             stage_power_components = list(set(stage_power_components))
             
@@ -198,6 +202,8 @@ def modify_spro(spro_file, CV_stage_components):
 
         insert_line(indent + "#volumetric flow, shroud leakage, absolute [m3/s]" + "\n" + indent + "plot.vShroudLeakageAbs = flow.qv@\"" \
             + leakage_interface + "\" - flow.qv@\"" + CVIs[-1] + "\"\n" + indent + "#plot.vShroudLeakageAbs:volumetric flow, shroud leakage, absolute [m3/s]")
+        
+        '''
 
         insert_line(indent + "#efficiency (t-t), imp1 passage [-]" + "\n" + indent + "plot.Eff_tt_" + impeller_number + "Passage = flow.qv@\"" \
             + leakage_interface + "\"*plot.DPtt" + impeller_number + "Passage/plot.PC" + impeller_number + "Passage" + "\n" + indent + "#plot.Eff_tt_" + impeller_number + "Passage:efficiency (t-t), imp1 passage [-]")
@@ -205,6 +211,8 @@ def modify_spro(spro_file, CV_stage_components):
         insert_line(indent + "#power, imp1 passage [W]" + "\n" + indent + "plot.PC" + impeller_number + "Passage = abs(flow.power@\"" + impeller_name + "-Hub\"" \
             + " + flow.power@\"" + impeller_name + "-Shroud\" + flow.power@\"" + impeller_name + "-BladeSides\" + flow.power@\"" + impeller_name + "-BladeLE\" + flow.power@\"" + impeller_name + "-BladeTE\")" \
             + "\n" + indent + "#plot.PC" + impeller_number + "Passage:power, imp1 passage [W]")
+
+        '''
 
         insert_line(indent + "#delta p (t-t), imp1 passage [Pa]" + "\n" + indent + "plot.DPtt2Passage = flow.mpt@\"" \
             + leakage_interface + "\" - flow.mpt@\"" + MGIs[0] + "\"\n" + indent + "#plot.DPtt2Passage:delta p (t-t), imp1 passage [Pa]")
@@ -219,8 +227,6 @@ def modify_spro(spro_file, CV_stage_components):
 
 def get_Dicts(spro_file):
 
-    isMassFlow = False
-
     with open(spro_file, "r") as infile:
         units_dict = {}
         desc_dict = {}
@@ -231,24 +237,14 @@ def get_Dicts(spro_file):
                 units_dict[key] = line.split(" ")[-1].strip() 
                 desc_dict[key] = line.split("[")[0].split(":")[1].strip()
 
-    if "Outlet volumetric flux" in desc_dict.items():
-        isMassFlow = False
-    else:
-        isMassFlow = True
-
-    return units_dict, desc_dict, isMassFlow
+    return units_dict, desc_dict
 
 def get_design_point(spro_file):
-
-    isMassFlow = False
 
     with open(spro_file, 'r') as infile:
         data = infile.readlines()
         for line_number, line in enumerate(data):
             if "vflow_out = " in line:
-                vflow_out_design_value = float(line.split("=")[1].strip())
-            elif "mflow = " in line:
-                isMassFlow = True
                 vflow_out_design_value = float(line.split("=")[1].strip())
 
             if "#Angular velocity" in line and "[" in line:
@@ -263,4 +259,4 @@ def get_design_point(spro_file):
         
         infile.close()
 
-    return [(vflow_out_design_value), (omega_design_value, omega_design_units)], isMassFlow
+    return [(vflow_out_design_value), (omega_design_value, omega_design_units)]
