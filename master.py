@@ -12,156 +12,412 @@ def build_template(cft_batch_file, template_file):
 
     master = {}
 
+    with open(cft_batch_file, 'r') as infile:
+        data = infile.readlines()
+        for line_number, line in enumerate(data):
+            if "<ExportComponents " in line:
+                num_components = int(line.split("\"")[1])
+                for _ in range(1, num_components + 1):
+                    for component_line in data[line_number + 1:line_number + num_components + 1]:
+                        component = re.search("Caption=\"(.+?)\"", component_line).group(1)
+                        index = re.search("Index=\"(.+?)\"", component_line).group(1)
+                        if component not in master:
+                            master[component] = {}
+                            master[component]['index'] = index
+
+    mean_line_sections = []
+
+    mer_data_sections = []
+
     with open(cft_batch_file, 'r') as infile, open(template_file, 'w') as outfile:
         data = infile.readlines()
-        for line_number1, line1 in enumerate(data):
-            if "<ExportComponents " in line1:
-                num_components = int(line1.split("\"")[1])
-                for index in range(1, num_components + 1):
-                    for line_number2, line2 in enumerate(data):
-                        component = re.search("Caption=\"(.+?)\"", data[line_number1 + index]).group(1)
-                        formatted_component = "".join(char for char in component if char.isalnum() or char in "_-")
-                        if formatted_component not in master:
-                            master[formatted_component] = {}
-                        if "Name=\"" + component in line2:
-                            book_end = line2.split(" ")[0].strip()[1:]
-                            for line_number3, line3 in enumerate(data):
-                                if "</" + book_end in line3:
-                                    section = data[line_number2:line_number3]
-                                    for line_number4, line4 in enumerate(section):
-                                        if "Caption=" in line4:
-                                            variable = line4.split(" ")[0].strip()[1:]
-                                            master[formatted_component][variable] = {}
+        for component in master.keys():
+            for line_number1, line1 in enumerate(data):
+                if "Name=\"" + component in line1 and "CFturboDesign" in line1:
+                    for line_number2, line2 in enumerate(data[line_number1:]):
+                        section_end = "</" + line1.split(" ")[0].strip()[1:]
+                        if section_end in line2:
+                            section = data[line_number1:line_number1 + line_number2]
+                            for line_number3, line3 in enumerate(section):
+                                if "<TMeanLine" in line3 and "Index=" in line3:
 
-                                            try:
-                                                var_type = re.search("Type=\"(.+?)\"", line4).group(1)
-                                                master[formatted_component][variable]['var_type'] = var_type
-                                            except AttributeError:
-                                                next
+                                    try:
+                                        index = re.search("Index=\"(.+?)\"", line3).group(1)
+                                    except AttributeError:
+                                        next
 
-                                            try:
-                                                count = re.search("Count=\"(.+?)\"", line4).group(1)
-                                                master[formatted_component][variable]['count'] = count
-                                            except AttributeError:
-                                                next
+                                    for line_number4, line4 in enumerate(data[(line_number1 + line_number3):]):
+                                        if "</TMeanLine>" in line4:
+                                            mean_line_section = data[(line_number1 + line_number3):(line_number1 + line_number3 + line_number4)]
+                                            break
 
-                                            try:
-                                                caption = re.search("Caption=\"(.+?)\"", line4).group(1)
-                                                master[formatted_component][variable]['caption'] = caption
-                                            except AttributeError:
-                                                next
+                                    mean_line_sections.append(mean_line_section)
 
-                                            try:
-                                                desc = re.search("Desc=\"(.+?)\"", line4).group(1)
-                                                master[formatted_component][variable]['desc'] = desc
-                                            except AttributeError:
-                                                next
-                                            
-                                            try:
-                                                unit = re.search("Unit=\"(.+?)\"", line4).group(1)
-                                                master[formatted_component][variable]['unit'] = unit
-                                            except AttributeError:
-                                                next
+                                    for line_number5, line5 in enumerate(mean_line_section):
+                                        if "Caption=" in line5:
+                                            variable = line5.split(" ")[0].strip()[1:]
+                                            master[component][variable + index] = {}
+                                            if "</" + variable + ">" in line5:
 
-                                            values = []
-                                            markers = []
-
-                                            if "<TMeanLine" in section[line_number4 - 1]:
-                                                index = int(re.search("Index=\"(.+?)\"", section[line_number4 - 1]).group(1)) + 1
-                                                value = float(re.search(">(.*)</", line4).group(1))
-                                                marker = "{" + formatted_component + "_" + variable + "_MeanLine" + str(index) + "}"
-
-                                                data[line_number2 + line_number4] = data[line_number2 + line_number4].replace(str(value), marker)
-                                                master[formatted_component][variable]['value'] = value
-                                                master[formatted_component][variable]['marker'] = marker
-
-                                            elif var_type == "Array1":
-                                                for line_number5, line5 in enumerate(section):
-                                                    if "</" + variable + ">" in line5:
-                                                        for line_number6, line6 in enumerate(section[(line_number4 + 1):line_number5]):
-                                                            try:
-                                                                index = line_number6 + 1
-                                                                value = float(re.search(">(.*)</", line6).group(1))
-                                                                marker = "{" + formatted_component + "_" + variable + "_MeanLine" + str(index) + "}"
-                                                                values.append(value)
-                                                                markers.append(marker)
-                                                            except AttributeError:
-                                                                next
-
-                                                            data[line_number2 + line_number4 + 1 + line_number6] = data[line_number2 + line_number4 + 1 + line_number6].replace(str(value), marker)
-                                                        
-                                                        master[formatted_component][variable]['value'] = values
-                                                        master[formatted_component][variable]['marker'] = markers
-                                            
-                                            elif var_type == "Vector2":
-                                                for line_number5, line5 in enumerate(section):
-                                                    if "</" + variable + ">" in line5:
-                                                        for line_number6, line6 in enumerate(section[(line_number4 + 1):line_number5]):
-                                                            try:
-                                                                coordinate = line6.split(" ")[0].strip()[1:]
-                                                                value = float(re.search(">(.*)</", line6).group(1))
-                                                                marker = "{" + formatted_component + "_" + variable + "_" + coordinate + "}"
-                                                                values.append(value)
-                                                                markers.append(marker)
-                                                            except AttributeError:
-                                                                next
-
-                                                            data[line_number2 + line_number4 + 1 + line_number6] = data[line_number2 + line_number4 + 1 + line_number6].replace(str(value), marker)
-                                                        
-                                                        master[formatted_component][variable]['value'] = values
-                                                        master[formatted_component][variable]['marker'] = markers
-
-                                            else:
                                                 try:
-                                                    if var_type == "Integer":
-                                                        value = int(re.search(">(.*)</", line4).group(1))
-                                                    else: 
-                                                        value = float(re.search(">(.*)</", line4).group(1))
-                                                    
-                                                    marker = "{" + formatted_component + "_" + variable + "}"
+                                                    var_type = re.search("Type=\"(.+?)\"", line5).group(1)
+                                                    master[component][variable + index]['var_type'] = var_type
                                                 except AttributeError:
                                                     next
 
-                                                data[line_number2 + line_number4] = data[line_number2 + line_number4].replace(str(value), marker)
+                                                try:
+                                                    count = re.search("Count=\"(.+?)\"", line5).group(1)
+                                                    master[component][variable + index]['count'] = count
+                                                except AttributeError:
+                                                    next
+
+                                                try:
+                                                    caption = re.search("Caption=\"(.+?)\"", line5).group(1)
+                                                    master[component][variable + index]['caption'] = caption
+                                                except AttributeError:
+                                                    next
+
+                                                try:
+                                                    desc = re.search("Desc=\"(.+?)\"", line5).group(1)
+                                                    master[component][variable + index]['desc'] = desc
+                                                except AttributeError:
+                                                    next
                                                 
-                                                master[formatted_component][variable]['value'] = value
-                                                master[formatted_component][variable]['marker'] = marker
+                                                try:
+                                                    unit = re.search("Unit=\"(.+?)\"", line5).group(1)
+                                                    master[component][variable + index]['unit'] = unit
+                                                except AttributeError:
+                                                    next
+
+                                                value = ">" + re.search(">(.*)</", line5).group(1) + "<"
+                                                marker = ">{" + component + "_" + variable + "_" + caption.replace(" ", '-') + "_" + index + "}<"
+                                                data[line_number1 + line_number3 + line_number5] = data[line_number1 + line_number3 + line_number5].replace(value, marker)
+                                            
+                                                master[component][variable + index]['value'] = value
+                                                master[component][variable + index]['marker'] = marker
+
+                                elif "MerEdge" in line3 and "Name" in line3:
+                                    try:
+                                        name = re.search("Name=\"(.+?)\"", line3).group(1)
+                                    except AttributeError:
+                                        next
+                                    
+                                    for line_number4, line4 in enumerate(data[(line_number1 + line_number3):]):
+                                        if "</" + "MerEdge>" in line4:
+                                            mer_edge_section = data[(line_number1 + line_number3 + 1):(line_number1 + line_number3 + line_number4)]
+                                            break
+
+                                    for line_number5, line5 in enumerate(mer_edge_section):
+                                        
+                                        variable = line5.split(" ")[0].strip()[1:]
+                                        master[component][variable + name.replace(" ", "-")] = {}
+
+                                        try:
+                                            var_type = re.search("Type=\"(.+?)\"", line5).group(1)
+                                            master[component][variable + name.replace(" ", "-")]['var_type'] = var_type
+                                        except AttributeError:
+                                            next
+
+                                        try:
+                                            count = re.search("Count=\"(.+?)\"", line5).group(1)
+                                            master[component][variable + name.replace(" ", "-")]['count'] = count
+                                        except AttributeError:
+                                            next
+
+                                        try:
+                                            caption = re.search("Caption=\"(.+?)\"", line5).group(1)
+                                            master[component][variable + name.replace(" ", "-")]['caption'] = caption
+                                        except AttributeError:
+                                            next
+
+                                        try:
+                                            desc = re.search("Desc=\"(.+?)\"", line5).group(1)
+                                            master[component][variable + name.replace(" ", "-")]['desc'] = desc
+                                        except AttributeError:
+                                            next
+                                        
+                                        try:
+                                            unit = re.search("Unit=\"(.+?)\"", line5).group(1)
+                                            master[component][variable + name.replace(" ", "-")]['unit'] = unit
+                                        except AttributeError:
+                                            next
+
+                                        value = ">" + re.search(">(.*)</", line5).group(1) + "<"
+                                        marker = ">{" + component + "_" + variable + "_" + caption.replace(" ", '-') + "_" + name.replace(" ", '-') + "}<"
+                                        data[line_number1 + line_number3 + line_number5 + 1] = data[line_number1 + line_number3 + line_number5 + 1].replace(value, marker)
+                                    
+                                        master[component][variable + name.replace(" ", "-")]['value'] = value
+                                        master[component][variable + name.replace(" ", "-")]['marker'] = marker
+
+                                elif "MerData" in line3 and "Name" in line3:
+
+                                    try:
+                                        name = re.search("Name=\"(.+?)\"", line3).group(1)
+                                    except AttributeError:
+                                        next
+
+                                    for line_number4, line4 in enumerate(data[(line_number1 + line_number3):]):
+                                        if "</" + "MerData>" in line4:
+                                            mer_data_section = data[(line_number1 + line_number3 + 1):(line_number1 + line_number3 + line_number4)]
+                                            break
+
+                                    mer_data_sections.append(mer_data_section)
+
+                                    for line_number5, line5 in enumerate(mer_data_section):
+                                        if "Vector2" in line5:
+
+                                            markers = []
+                                            values = []
+
+                                            variable = line5.split(" ")[0].strip()[1:]
+                                            master[component][name.replace(" ", "-") + variable] = {}
+
+                                            try:
+                                                var_type = re.search("Type=\"(.+?)\"", line5).group(1)
+                                                master[component][name.replace(" ", "-") + variable] ['var_type'] = var_type
+                                            except AttributeError:
+                                                next
+
+                                            try:
+                                                count = re.search("Count=\"(.+?)\"", line5).group(1)
+                                                master[component][name.replace(" ", "-") + variable] ['count'] = count
+                                            except AttributeError:
+                                                next
+
+                                            try:
+                                                caption = re.search("Caption=\"(.+?)\"", line5).group(1)
+                                                master[component][name.replace(" ", "-") + variable] ['caption'] = caption
+                                            except AttributeError:
+                                                next
+
+                                            try:
+                                                desc = re.search("Desc=\"(.+?)\"", line5).group(1)
+                                                master[component][name.replace(" ", "-") + variable]['desc'] = desc
+                                            except AttributeError:
+                                                next
+                                            
+                                            try:
+                                                unit = re.search("Unit=\"(.+?)\"", line5).group(1)
+                                                master[component][name.replace(" ", "-") + variable]['unit'] = unit
+                                            except AttributeError:
+                                                next
+
+                                            for vector_index in range(1, 3):
+                                                vector_variable = data[line_number1 + line_number3 + line_number5 + vector_index + 1].split(" ")[0].strip()[1:]
+                                                value = ">" + re.search(">(.*)</", data[line_number1 + line_number3 + line_number5 + vector_index + 1]).group(1) + "<"
+                                                marker = ">{" + component + "_" + name.replace(" ", "-") + "_" + variable + "_" + caption.replace(" ", '-') + "_" + vector_variable + "}<"
+                                                data[line_number1 + line_number3 + line_number5 + vector_index + 1] = data[line_number1 + line_number3 + line_number5 + vector_index + 1].replace(value, marker)
+                                                values.append(value)
+                                                markers.append(marker)
+
+                                            master[component][name.replace(" ", "-") + variable]['value'] = values
+                                            master[component][name.replace(" ", "-") + variable]['marker'] = markers   
+                
+
+                                elif "Caption=" in line3:
+                                    if not any(line3 in string for string in mean_line_sections):
+                                        variable = line3.split(" ")[0].strip()[1:]
+
+                                        try:
+                                            caption = re.search("Caption=\"(.+?)\"", line3).group(1)
+                                        except AttributeError:
+                                            next
+
+                                        master[component][variable + caption.replace(" ", "-")] = {}
+
+                                        if "</" + variable + ">" in line3:
+
+                                            try:
+                                                var_type = re.search("Type=\"(.+?)\"", line3).group(1)
+                                                master[component][variable + caption.replace(" ", "-")]['var_type'] = var_type
+                                            except AttributeError:
+                                                next
+
+                                            try:
+                                                count = re.search("Count=\"(.+?)\"", line3).group(1)
+                                                master[component][variable + caption.replace(" ", "-")]['count'] = count
+                                            except AttributeError:
+                                                next
+
+                                            try:
+                                                caption = re.search("Caption=\"(.+?)\"", line3).group(1)
+                                                master[component][variable + caption.replace(" ", "-")]['caption'] = caption
+                                            except AttributeError:
+                                                next
+                                            
+
+                                            try:
+                                                desc = re.search("Desc=\"(.+?)\"", line3).group(1)
+                                                master[component][variable + caption.replace(" ", "-")]['desc'] = desc
+                                            except AttributeError:
+                                                next
+                                            
+                                            try:
+                                                unit = re.search("Unit=\"(.+?)\"", line3).group(1)
+                                                master[component][variable + caption.replace(" ", "-")]['unit'] = unit
+                                            except AttributeError:
+                                                next
+
+                                            value = ">" + re.search(">(.*)</", line3).group(1) + "<"
+                                            marker = ">{" + component + "_" + variable + "_" + caption.replace(" ", '-') + "}<"
+                                            data[line_number1 + line_number3] = data[line_number1 + line_number3].replace(value, marker)
+                                            master[component][variable + caption.replace(" ", "-")]['value'] = value
+                                            master[component][variable + caption.replace(" ", "-")]['marker'] = marker   
+
+                                        elif "Array1" in line3:
+
+                                            markers = []
+                                            values = []
+
+                                            variable = line3.split(" ")[0].strip()[1:]
+                                            master[component][variable] = {}
+
+                                            try:
+                                                var_type = re.search("Type=\"(.+?)\"", line3).group(1)
+                                                master[component][variable]['var_type'] = var_type
+                                            except AttributeError:
+                                                next
+
+                                            try:
+                                                count = re.search("Count=\"(.+?)\"", line3).group(1)
+                                                master[component][variable]['count'] = count
+                                            except AttributeError:
+                                                next
+
+                                            try:
+                                                caption = re.search("Caption=\"(.+?)\"", line3).group(1)
+                                                master[component][variable]['caption'] = caption
+                                            except AttributeError:
+                                                next
+
+                                            try:
+                                                desc = re.search("Desc=\"(.+?)\"", line3).group(1)
+                                                master[component][variable]['desc'] = desc
+                                            except AttributeError:
+                                                next
+                                            
+                                            try:
+                                                unit = re.search("Unit=\"(.+?)\"", line3).group(1)
+                                                master[component][variable]['unit'] = unit
+                                            except AttributeError:
+                                                next
+
+                                            for line_number4, line4 in enumerate(data[(line_number1 + line_number3):]):
+                                                if "</" + variable + ">" in line4:
+                                                    array_section = data[(line_number1 + line_number3 + 1):(line_number1 + line_number3 + line_number4)]
+                                                    break
+
+                                            for index in range(int(count)):
+                                                for line_number5, line5 in enumerate(array_section):
+                                                    if "Index=\"" + str(index) + "\"" in line5:
+                                                        if "Type=\"" + "Vector" in line5:
+                                                            for vector_index in range(1, 3):
+                                                                vector_variable = data[line_number1 + line_number3 + line_number5 + 1 + vector_index].split(" ")[0].strip()[1:]
+                                                                value = ">" + re.search(">(.*)</", data[line_number1 + line_number3 + line_number5 + 1 + vector_index]).group(1) + "<"
+                                                                marker = ">{" + component + "_" + variable + "_" + vector_variable + "_" + str(index) + "}<"
+                                                                data[line_number1 + line_number3 + line_number5 + 1 + vector_index] = data[line_number1 + line_number3 + line_number5 + 1 + vector_index].replace(value, marker)
+                                                                values.append(value)
+                                                                markers.append(marker)
+
+                                                    
+                                                        elif "Type=\"" + "Float" + "\"" in line5:
+                                                            value = ">" + re.search(">(.*)</", data[line_number1 + line_number3 + line_number5 + 1]).group(1) + "<"
+                                                            marker = ">{" + component + "_" + variable + "_" + caption.replace(" ", '-') + "_" + str(index) + "}<"
+                                                            data[line_number1 + line_number3 + line_number5 + 1] = data[line_number1 + line_number3 + line_number5 + 1].replace(value, marker)
+                                                            values.append(value)
+                                                            markers.append(marker)
+
+                                            master[component][variable]['value'] = values
+                                            master[component][variable]['marker'] = markers   
+
+                                        elif "Vector2" in line3:
+                                            if not any(line3 in string for string in mer_data_sections):
+
+                                                markers = []
+                                                values = []
+
+                                                variable = line3.split(" ")[0].strip()[1:]
+                                                master[component][variable] = {}
+
+                                                try:
+                                                    var_type = re.search("Type=\"(.+?)\"", line3).group(1)
+                                                    master[component][variable]['var_type'] = var_type
+                                                except AttributeError:
+                                                    next
+
+                                                try:
+                                                    count = re.search("Count=\"(.+?)\"", line3).group(1)
+                                                    master[component][variable]['count'] = count
+                                                except AttributeError:
+                                                    next
+
+                                                try:
+                                                    caption = re.search("Caption=\"(.+?)\"", line3).group(1)
+                                                    master[component][variable]['caption'] = caption
+                                                except AttributeError:
+                                                    next
+
+                                                try:
+                                                    desc = re.search("Desc=\"(.+?)\"", line3).group(1)
+                                                    master[component][variable]['desc'] = desc
+                                                except AttributeError:
+                                                    next
+                                                
+                                                try:
+                                                    unit = re.search("Unit=\"(.+?)\"", line3).group(1)
+                                                    master[component][variable]['unit'] = unit
+                                                except AttributeError:
+                                                    next
+
+                                                for vector_index in range(1, 3):
+                                                    vector_variable = data[line_number1 + line_number3 + vector_index].split(" ")[0].strip()[1:]
+                                                    value = ">" + re.search(">(.*)</", data[line_number1 + line_number3 + vector_index]).group(1) + "<"
+                                                    marker = ">{" + component + "_" + variable + "_" + caption.replace(" ", '-') + "_" + vector_variable + "}<"
+                                                    data[line_number1 + line_number3 + vector_index] = data[line_number1 + line_number3 + vector_index].replace(value, marker)
+                                                    values.append(value)
+                                                    markers.append(marker)
+
+                                                master[component][variable]['value'] = values
+                                                master[component][variable]['marker'] = markers   
+  
+                            break
 
         outfile.writelines(data)
 
     simple = {}
 
-    for formatted_component in master.keys():
-        for variable in master[formatted_component].keys():
-            marker = master[formatted_component][variable].get('marker')
-            unit = master[formatted_component][variable].get('unit')
-            if type(marker) == str:
-                value = master[formatted_component][variable].get('value')
-                simple[marker] = (value, unit)
-            if type(marker) == list:
-                for index, item in enumerate(marker):
-                    value = master[formatted_component][variable].get('value')[index]
-                    simple[marker[index]] = (value, unit)
+    for component in master.keys():
+        for variable in master[component].keys():
+            if variable != "index":
+                marker = master[component][variable].get('marker')
+                unit = master[component][variable].get('unit')
+                if type(marker) == str:
+                    value = master[component][variable].get('value')
+                    simple[marker] = (value, unit)
+                if type(marker) == list:
+                    for _ in range(len(marker)):
+                        value = master[component][variable].get('value')[_]
+                        simple[marker[_]] = (value, unit)
 
     return master, simple
 
 
-def csv_to_np(simple, csv_file):
+def csv_to_np(simple, csv_file, project_name):
 
-    header = ["Design#"] + [marker[1:-1] for marker in simple.keys()]
+    header = ["Design#"] + [marker[2:-2] for marker in simple.keys()]
 
     first_row = [1] 
     units_row = ['-']
     
     for (original, unit) in simple.values():
         if unit == 'rad':
-            first_row.append(str(round(degrees(original), 3)))
+            first_row.append(str(round(degrees(float(original[1:-1])), 3)))
             units_row.append('deg')
         elif unit == None:
-            first_row.append(str(original))
+            first_row.append(str(original[1:-1]))
             units_row.append('-')
         else:
-            first_row.append(str(original))
+            first_row.append(str(original[1:-1]))
             units_row.append(unit)
 
     if not os.path.exists(csv_file):
@@ -194,27 +450,17 @@ def build_designs(project_name, solver_type, template_file, values_array, simple
                 for line_number, line in enumerate(data):        
                     if marker in line:
                         if unit == 'rad':
-                            data[line_number] = line.replace(marker, str(radians(float(row[value_number]))))
+                            data[line_number] = line.replace(marker[1:-1], str(radians(float(row[value_number]))))
                         else:
-                            data[line_number] = line.replace(marker, row[value_number])
-
-                    if "InputFile=" in line:
-                        old_InputFile = re.search("InputFile=\"(.*)\"", line).group(1)
-                        new_InputFile = ".\\" + project_name + ".cft"
-                        data[line_number] = line.replace(old_InputFile, new_InputFile)
-
-                    if "<WorkingDir>" in line:
-                        old_WorkingDir = re.search("<WorkingDir>(.*)</WorkingDir>", line).group(1)
-                        new_WorkingDir = ".\\"
-                        data[line_number] = line.replace(old_WorkingDir, new_WorkingDir)
+                            data[line_number] = line.replace(marker[1:-1], row[value_number])
                             
                     if "<BaseFileName>" in line:
-                        old_BaseFileName = re.search("<BaseFileName>(.*)</BaseFileName>", line).group(1)
-                        data[line_number] = line.replace(old_BaseFileName, design_file.replace(".cft-batch", ""))
-                        
+                        old_name = re.search("<BaseFileName>(.*)</BaseFileName>", line).group(1)
+                        data[line_number] = line.replace(old_name, design_file.replace(".cft-batch", ""))
+
                     if "<OutputFile>" in line:
-                        old_OutputFile = re.search("<OutputFile>(.*)</OutputFile>", line).group(1)
-                        data[line_number] = line.replace(old_OutputFile, design_file.replace(".cft-batch", ".cft"))
+                        old_name = re.search("<OutputFile>(.*)</OutputFile>", line).group(1)
+                        data[line_number] = line.replace(old_name, design_file.replace(".cft-batch", ".cft"))
 
             outfile.writelines(data)
 
@@ -356,7 +602,7 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
 
     return spro_dicts
 
-def post_process(project_name, spro_dict, steady_avg_window, transient_avg_window):
+def post_process(run_design_variation_bool, project_name, spro_dict, steady_avg_window, transient_avg_window):
 
     integrals_file = spro_dict.get('file_name').replace(".spro", "_integrals.txt")
 
@@ -422,6 +668,13 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
 
     order = ['rpm', 'omega', 'flow_out', 'DPtt', 'Eff_tt'] + stage_keys
 
+    if run_design_variation_bool.lower() == "true":
+        design_number = "Design" + spro_dict.get('file_name').split("Design")[1].split("_" + spro_dict.get('solver_type'))[0]
+        result_dict['Design No.'] = design_number
+        units_dict['Design No.'] = '[-]'
+        desc_dict['Design No.'] = '[-]'
+        order.insert(0, 'Design No.')
+
     for key, value in desc_dict.items():
         if "imp" in value.lower() and "delta p" in value and "passage" not in value:
             order.append(key)
@@ -454,7 +707,7 @@ def post_process(project_name, spro_dict, steady_avg_window, transient_avg_windo
     return 0
 
 
-def run_simerics(project_name, spro_dicts, steady_avg_window, transient_avg_window):
+def run_simerics(run_design_variation_bool, project_name, spro_dicts, steady_avg_window, transient_avg_window):
 
     spro_files = [spro_dict.get('file_name').strip() for spro_dict in spro_dicts]  
 
@@ -474,7 +727,7 @@ def run_simerics(project_name, spro_dicts, steady_avg_window, transient_avg_wind
 
             subprocess.call(os.path.abspath("simerics.bat"))
         
-        post_process(project_name, spro_dicts[index], steady_avg_window, transient_avg_window)
+        post_process(run_design_variation_bool, project_name, spro_dicts[index], steady_avg_window, transient_avg_window)
 
     return 0
 
@@ -521,13 +774,13 @@ def main():
 
     if run_design_variation_bool.lower() == "true":
         master, simple = build_template(project_name + "_steady.cft-batch", "template_steady.cft-batch")
-        values_array = csv_to_np(simple, project_name + "_design_parameters.csv")
+        values_array = csv_to_np(simple, project_name + "_design_parameters.csv", project_name)
         designs = build_designs(project_name, "steady", "template_steady.cft-batch", values_array, simple)
         spro_files = run_design_variation(designs, cft_version)
 
         if run_transient_bool.lower() == "true":
             master, simple = build_template(project_name + "_transient.cft-batch", "template_transient.cft-batch")
-            values_array = csv_to_np(simple, project_name + "_design_parameters.csv")
+            values_array = csv_to_np(simple, project_name + "_design_parameters.csv", project_name)
             designs = build_designs(project_name, "transient", "template_transient.cft-batch", values_array, simple)
             spro_files = spro_files + run_design_variation(designs, cft_version)
 
@@ -541,7 +794,7 @@ def main():
 
     if run_simerics_bool.lower() == "true":
         spro_dicts = run_performance_map(run_performance_map_bool, spro_files, CV_stage_components, rpm_type, rpm_values, flowrate_type, flowrate_values)
-        run_simerics(project_name, spro_dicts, steady_avg_window, transient_avg_window)
+        run_simerics(run_design_variation_bool, project_name, spro_dicts, steady_avg_window, transient_avg_window)
         combine_csv(project_name)
 
 main()
