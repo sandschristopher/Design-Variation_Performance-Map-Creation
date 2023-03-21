@@ -227,6 +227,8 @@ def modify_spro(spro_file, CV_stage_components):
 
 def get_Dicts(spro_file):
 
+    isMassFlow = False
+
     with open(spro_file, "r") as infile:
         units_dict = {}
         desc_dict = {}
@@ -237,14 +239,24 @@ def get_Dicts(spro_file):
                 units_dict[key] = line.split(" ")[-1].strip() 
                 desc_dict[key] = line.split("[")[0].split(":")[1].strip()
 
-    return units_dict, desc_dict
+    if "Outlet volumetric flux" in desc_dict.items():
+        isMassFlow = False
+    else:
+        isMassFlow = True
+
+    return units_dict, desc_dict, isMassFlow
 
 def get_design_point(spro_file):
+
+    isMassFlow = False
 
     with open(spro_file, 'r') as infile:
         data = infile.readlines()
         for line_number, line in enumerate(data):
             if "vflow_out = " in line:
+                vflow_out_design_value = float(line.split("=")[1].strip())
+            elif "mflow = " in line:
+                isMassFlow = True
                 vflow_out_design_value = float(line.split("=")[1].strip())
 
             if "#Angular velocity" in line and "[" in line:
@@ -259,4 +271,4 @@ def get_design_point(spro_file):
         
         infile.close()
 
-    return [(vflow_out_design_value), (omega_design_value, omega_design_units)]
+    return [(vflow_out_design_value), (omega_design_value, omega_design_units)], isMassFlow
