@@ -1,5 +1,6 @@
 from re import search
 from itertools import chain
+from collections import Counter
 import inflect
 
 def get_stage_components(spro_file):
@@ -102,6 +103,23 @@ def modify_spro(spro_file, CV_stage_components):
             if ".sgrd" in line:
                 data[line_number] = line.replace("transient", "steady")
                 break
+
+    # Gets the template of the efficiency expression:
+    with open(spro_file, 'r') as infile:
+        data = infile.readlines()
+        for line_number, line in enumerate(data):
+            if "plot.Eff_tt = " in line:
+                efficiency_expression = line.strip().split("=")[1]
+                efficiency_parts = efficiency_expression.split("\"")
+                break
+        
+        for part in efficiency_parts:
+            if "-Inflow" in part:
+                inlet = part
+            if "-Outflow" in part:
+                outlet = part
+
+        original_efficiency = (inlet, outlet)
     
     # Gets name of leakage interface:
         with open(spro_file, 'r') as infile:
@@ -147,7 +165,8 @@ def modify_spro(spro_file, CV_stage_components):
                 data = "".join(data)
                 outfile.write(data)
 
-    insert_line(indent + "#head [m]" + "\n" + indent + "plot.H = plot.DPtt/rho/9.81 \n" + indent + "#plot.H:head [m]")
+    if "PC" in efficiency_expression:
+        insert_line(indent + "#head [m]" + "\n" + indent + "plot.H = plot.DPtt/rho/9.81 \n" + indent + "#plot.H:head [m]")
 
     if CV_stage_components != 0:
         for CV_index, stage_components in enumerate(CV_stage_components, start=1):
@@ -170,19 +189,16 @@ def modify_spro(spro_file, CV_stage_components):
             else:
                 stage_power = " + ".join(stage_power_components)
 
-            insert_line(indent + "#delta p (t-t), stage" + str(CV_index) + " [Pa]" + "\n" + indent + "plot.DPtt_stage" + str(CV_index) + " = flow.mpt@\"" \
-                + CVIs[stage_components[-1]] + "\"-flow.mpt@\"" + CVIs[(stage_components[0] - 1)] + "\"\n" + indent + "#plot.DPtt_stage" + str(CV_index) + ":delta p (t-t), stage" + str(CV_index) + " [Pa]")
+            insert_line(indent + "#delta p (t-t), CV" + str(CV_index) + " [Pa]" + "\n" + indent + "plot.DPtt_CV" + str(CV_index) + " = flow.mpt@\"" \
+                + CVIs[stage_components[-1]] + "\"-flow.mpt@\"" + CVIs[(stage_components[0] - 1)] + "\"\n" + indent + "#plot.DPtt_CV" + str(CV_index) + ":delta p (t-t), CV" + str(CV_index) + " [Pa]")
             
             if stage_power != False:
-                insert_line(indent + "#efficiency (t-t), stage" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_stage" + str(CV_index) + " = flow.q@\"" \
-                    + CVIs[stage_components[-1]] + "\"*plot.DPtt_stage" + str(CV_index) + "/rho/(" + stage_power + ")\n" + indent + "#plot.Eff_tt_stage" + str(CV_index) + ":efficiency (t-t), stage" + str(CV_index) + " [-]")
+                insert_line(indent + "#efficiency (t-t), CV" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_CV" + str(CV_index) + " = "
+                    + efficiency_expression.replace(inlet, CVIs[(stage_components[0] - 1)]).replace(outlet, CVIs[stage_components[-1]])
+                        + "\n" + indent + "#plot.Eff_tt_CV" + str(CV_index) + ":efficiency (t-t), CV" + str(CV_index) + " [-]")
 
-    for i in range(1, len(CVIs)):
-        insert_line(indent + "#delta p (t-t), CV" + str(i) + " [Pa]" + "\n" + indent + "plot.DPttCV" + str(i) + " = flow.mpt@\"" \
-            + CVIs[i] + "\"-flow.mpt@\"" + CVIs[i - 1] + "\"\n" + indent + "#plot.DPttCV" + str(i) + ":delta p (t-t), CV" \
-            + str(i) + " [Pa]")
+    for i, CVI in enumerate(list(dict.fromkeys(CVIs))):
 
-    for i, CVI in enumerate(CVIs):
         insert_line(indent + "#pressure (t), CVI" + str(i) + " [Pa]" + "\n" + indent + "plot.PtCVI" + str(i) + " = flow.mpt@\"" \
             + CVI + "\"\n" + indent + "#plot.PtCVI" + str(i) + ":pressure (t), CVI" + str(i) + " [Pa]")
 
