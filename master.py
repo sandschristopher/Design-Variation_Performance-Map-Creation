@@ -661,7 +661,7 @@ def post_process(run_design_variation_bool, project_name, spro_dict, steady_avg_
     stage_keys = []
 
     for key in units_dict.keys():
-        if "stage" in key:
+        if "CV" in key and "CVI" not in key:
             stage_keys.append(key)
 
     stage_keys = sorted(stage_keys, key=lambda x:(x[-1], x))
