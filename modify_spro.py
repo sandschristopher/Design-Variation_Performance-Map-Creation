@@ -108,18 +108,17 @@ def modify_spro(spro_file, CV_stage_components):
     with open(spro_file, 'r') as infile:
         data = infile.readlines()
         for line_number, line in enumerate(data):
+            if "plot.DPtt = " in line:
+                pressure_expression = line.strip().split("=")[1]
+                pressure_parts = pressure_expression.split("\"")
             if "plot.Eff_tt = " in line:
                 efficiency_expression = line.strip().split("=")[1]
-                efficiency_parts = efficiency_expression.split("\"")
-                break
         
-        for part in efficiency_parts:
+        for part in pressure_parts:
             if "-Inflow" in part:
                 inlet = part
             if "-Outflow" in part:
                 outlet = part
-
-        original_efficiency = (inlet, outlet)
     
     # Gets name of leakage interface:
         with open(spro_file, 'r') as infile:
