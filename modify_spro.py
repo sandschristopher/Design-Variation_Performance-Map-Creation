@@ -176,7 +176,7 @@ def modify_spro(spro_file, CV_stage_components):
 
             for patch in stage_patches[1:-1]:
                 for turbo in turbos:
-                    if turbo[0] in patch:
+                    if turbo[0] in patch and "Outflow" in patch:
                         stage_power_components.append("plot.PC" + turbo[1])
 
             stage_power_components = list(set(stage_power_components))
@@ -192,7 +192,13 @@ def modify_spro(spro_file, CV_stage_components):
                 + CVIs[stage_components[-1]] + "\"-flow.mpt@\"" + CVIs[(stage_components[0] - 1)] + "\"\n" + indent + "#plot.DPtt_CV" + str(CV_index) + ":delta p (t-t), CV" + str(CV_index) + " [Pa]")
             
             if stage_power != False:
-                insert_line(indent + "#efficiency (t-t), CV" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_CV" + str(CV_index) + " = "
+                if "PC" in efficiency_expression:
+                    insert_line(indent + "#efficiency (t-t), CV" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_CV" + str(CV_index) + " = "
+                    + efficiency_expression.replace(inlet, CVIs[(stage_components[0] - 1)]).replace(outlet, CVIs[stage_components[-1]]).replace(efficiency_expression.split("/")[-1], stage_power)
+                        + "\n" + indent + "#plot.Eff_tt_CV" + str(CV_index) + ":efficiency (t-t), CV" + str(CV_index) + " [-]")
+
+                else:
+                    insert_line(indent + "#efficiency (t-t), CV" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_CV" + str(CV_index) + " = "
                     + efficiency_expression.replace(inlet, CVIs[(stage_components[0] - 1)]).replace(outlet, CVIs[stage_components[-1]])
                         + "\n" + indent + "#plot.Eff_tt_CV" + str(CV_index) + ":efficiency (t-t), CV" + str(CV_index) + " [-]")
 
