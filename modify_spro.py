@@ -2,6 +2,8 @@ from re import search
 from itertools import chain
 from collections import Counter
 import inflect
+import textwrap
+
 
 def get_stage_components(spro_file):
 
@@ -15,9 +17,13 @@ def get_stage_components(spro_file):
             if "vc volume=" in line:
                 volumes.append(line.split("\"")[1])
 
-    volumes =  list(dict.fromkeys(volumes)) 
+    volumes =  list(dict.fromkeys(volumes))
 
-    CV_num = int(input("\nThe export from CFturbo to SimericsMP automatically creates expressions to calculate the total pressure difference and total efficiency of the entire device (inlet of first component to outlet of the final component) by default, but it might be pertinent to analyze a subsect control volume within the entire device.\n\nHow many subsect control volumes would you like to analyze: "))
+    user_prompt = textwrap.wrap("The export from CFturbo to SimericsMP automatically creates expressions for certain performance variables of interest (e.g., total/static pressure difference, total efficiency, etc.) of the entire device (inlet of first component to outlet of the final component)" \
+        + " as well as the total/static pressure difference and efficiencies of each component within the device. It might be pertinent, however, to analyze a subsect control volume within the entire device to get the total/static pressure difference or efficiency across a passage of interest (e.g. stage)." \
+            + " If so, how many subsect control volumes would you like to analyze: ")
+
+    CV_num = int(input("\n" + "\n".join(user_prompt) + " "))
 
     CV_stage_components = []
 
