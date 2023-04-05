@@ -1,5 +1,5 @@
 [Project]
-	project_name = fluidraUS_dualstage_v4
+	project_name = project_name
 	
 [DesignVariation]
 	run_design_variation_bool = False
@@ -18,7 +18,7 @@
 
 [PerformanceMap]
 	run_performance_map_bool = True
-	rpm_type = relative
-	rpm_values = 1.0
-	flowrate_type = absolute
-	flowrate_values = 0.0003155 0.00047318 0.0006309 0.00078863 0.0009464 0.0011041 0.0012618 0.0014195 0.0015773
+	rpm_type = absolute
+	rpm_values = 6000 7000 8000
+	flowrate_type = relative
+	flowrate_values = 0.50 0.75 1.00 1.25 1.50
