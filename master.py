@@ -486,7 +486,7 @@ def run_design_variation(designs, cft_version):
 
     return spro_files
 
-def run_performance_map(run_performance_map_bool, spro_files, CV_stage_components, rpm_type, rpm_values, flowrate_type, flowrate_values, simerics_version):
+def run_performance_map(run_performance_map_bool, spro_files, CV_stage_components, rpm_type, rpm_values, flowrate_type, flowrate_values):
 
     spro_dicts = []
 
@@ -497,7 +497,7 @@ def run_performance_map(run_performance_map_bool, spro_files, CV_stage_component
         if not os.path.exists(spro_file.replace(".spro", ".sgrd")):
             with open("simerics.bat", "w") as batch:
                 batch.truncate(0)
-                simerics_command = " \"C:\Program Files\Simerics\\" + simerics_version + ".exe\" \"" + spro_file + "\" -saveAs \"" + spro_file.replace(".spro", "") + "\"\n"
+                simerics_command = "\"C:\Program Files\Simerics\SimericsMP.exe\" \"" + spro_file + "\" -saveAs \"" + spro_file.replace(".spro", "") + "\"\n"
                 batch.write(simerics_command)
 
                 batch.close()
@@ -606,7 +606,9 @@ def post_process(run_design_variation_bool, project_name, spro_dict, steady_avg_
 
     integrals_file = spro_dict.get('file_name').replace(".spro", "_integrals.txt")
 
-    units_dict, desc_dict, isMassFlow = get_Dicts(spro_dict.get("file_name"))
+    units_dict, desc_dict = get_Dicts(spro_dict.get("file_name"))
+
+    [(vflow_out_design_value), (omega_design_value, omega_design_units)], isMassFlow = get_design_point(spro_dict.get("file_name"))
 
     if spro_dict.get('solver_type').lower() == "steady":
         avg_window = int(steady_avg_window)
@@ -707,7 +709,7 @@ def post_process(run_design_variation_bool, project_name, spro_dict, steady_avg_
     return 0
 
 
-def run_simerics(run_design_variation_bool, project_name, spro_dicts, steady_avg_window, transient_avg_window, simerics_version):
+def run_simerics(run_design_variation_bool, project_name, spro_dicts, steady_avg_window, transient_avg_window):
 
     spro_files = [spro_dict.get('file_name').strip() for spro_dict in spro_dicts]  
 
@@ -716,11 +718,11 @@ def run_simerics(run_design_variation_bool, project_name, spro_dicts, steady_avg
             with open("simerics.bat", "w") as batch:
                 batch.truncate(0)
                 if "steady" in spro_file:
-                    simerics_command = " \"C:\Program Files\Simerics\\" + simerics_version + ".exe\" -run \"" + spro_file + "\""
+                    simerics_command = "\"C:\Program Files\Simerics\SimericsMP.exe\" -run \"" + spro_file + "\""
                     batch.write(simerics_command)
             
                 elif "transient" in spro_file:
-                    simerics_command = " \"C:\Program Files\Simerics\\" + simerics_version + ".exe\" -run \"" + spro_file + "\" \"" + spro_file.replace("transient", "steady").replace(".spro", ".sres") + "\"\n"
+                    simerics_command = "\"C:\Program Files\Simerics\SimericsMP.exe\" -run \"" + spro_file + "\" \"" + spro_file.replace("transient", "steady").replace(".spro", ".sres") + "\"\n"
                     batch.write(simerics_command)
 
                 batch.close()
@@ -763,7 +765,6 @@ def main():
     run_design_variation_bool = Get_ConfigValue("DesignVariation", "run_design_variation_bool")
     cft_version = Get_ConfigValue("DesignVariation", "cft_version")
     run_simerics_bool = Get_ConfigValue("Simerics", "run_simerics_bool")
-    simerics_version = Get_ConfigValue("Simerics", "simerics_version")
     steady_avg_window = Get_ConfigValue("steady", "avg_window")
     run_transient_bool = Get_ConfigValue("transient", "run_transient_bool")
     transient_avg_window = Get_ConfigValue("transient", "avg_window")
@@ -794,8 +795,8 @@ def main():
     CV_stage_components = get_stage_components(spro_files[0])
 
     if run_simerics_bool.lower() == "true":
-        spro_dicts = run_performance_map(run_performance_map_bool, spro_files, CV_stage_components, rpm_type, rpm_values, flowrate_type, flowrate_values, simerics_version)
-        run_simerics(run_design_variation_bool, project_name, spro_dicts, steady_avg_window, transient_avg_window, simerics_version)
+        spro_dicts = run_performance_map(run_performance_map_bool, spro_files, CV_stage_components, rpm_type, rpm_values, flowrate_type, flowrate_values)
+        run_simerics(run_design_variation_bool, project_name, spro_dicts, steady_avg_window, transient_avg_window)
         combine_csv(project_name)
 
 main()

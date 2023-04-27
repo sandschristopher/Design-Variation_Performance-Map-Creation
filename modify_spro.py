@@ -2,8 +2,6 @@ from re import search
 from itertools import chain
 from collections import Counter
 import inflect
-import textwrap
-
 
 def get_stage_components(spro_file):
 
@@ -17,13 +15,9 @@ def get_stage_components(spro_file):
             if "vc volume=" in line:
                 volumes.append(line.split("\"")[1])
 
-    volumes =  list(dict.fromkeys(volumes))
+    volumes =  list(dict.fromkeys(volumes)) 
 
-    user_prompt = textwrap.wrap("The export from CFturbo to SimericsMP automatically creates expressions for certain performance variables of interest (e.g., total/static pressure difference, total efficiency, etc.) of the entire device (inlet of first component to outlet of the final component)" \
-        + " as well as the total/static pressure difference and efficiencies of each component within the device. It might be pertinent, however, to analyze a subsect control volume within the entire device to get the total/static pressure difference or efficiency across a passage of interest (e.g. stage)." \
-            + " If so, how many subsect control volumes would you like to analyze: ")
-
-    CV_num = int(input("\n" + "\n".join(user_prompt) + " "))
+    CV_num = int(input("\nThe export from CFturbo to SimericsMP automatically creates expressions to calculate the total pressure difference and total efficiency of the entire device (inlet of first component to outlet of the final component) by default, but it might be pertinent to analyze a subsect control volume within the entire device.\n\nHow many subsect control volumes would you like to analyze: "))
 
     CV_stage_components = []
 
@@ -182,7 +176,7 @@ def modify_spro(spro_file, CV_stage_components):
 
             for patch in stage_patches[1:-1]:
                 for turbo in turbos:
-                    if turbo[0] in patch and "Outflow" in patch:
+                    if turbo[0] in patch:
                         stage_power_components.append("plot.PC" + turbo[1])
 
             stage_power_components = list(set(stage_power_components))
@@ -198,13 +192,7 @@ def modify_spro(spro_file, CV_stage_components):
                 + CVIs[stage_components[-1]] + "\"-flow.mpt@\"" + CVIs[(stage_components[0] - 1)] + "\"\n" + indent + "#plot.DPtt_CV" + str(CV_index) + ":delta p (t-t), CV" + str(CV_index) + " [Pa]")
             
             if stage_power != False:
-                if "PC" in efficiency_expression:
-                    insert_line(indent + "#efficiency (t-t), CV" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_CV" + str(CV_index) + " = "
-                    + efficiency_expression.replace(inlet, CVIs[(stage_components[0] - 1)]).replace(outlet, CVIs[stage_components[-1]]).replace(efficiency_expression.split("/")[-1], stage_power)
-                        + "\n" + indent + "#plot.Eff_tt_CV" + str(CV_index) + ":efficiency (t-t), CV" + str(CV_index) + " [-]")
-
-                else:
-                    insert_line(indent + "#efficiency (t-t), CV" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_CV" + str(CV_index) + " = "
+                insert_line(indent + "#efficiency (t-t), CV" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_CV" + str(CV_index) + " = "
                     + efficiency_expression.replace(inlet, CVIs[(stage_components[0] - 1)]).replace(outlet, CVIs[stage_components[-1]])
                         + "\n" + indent + "#plot.Eff_tt_CV" + str(CV_index) + ":efficiency (t-t), CV" + str(CV_index) + " [-]")
 
@@ -254,8 +242,6 @@ def modify_spro(spro_file, CV_stage_components):
 
 def get_Dicts(spro_file):
 
-    isMassFlow = False
-
     with open(spro_file, "r") as infile:
         units_dict = {}
         desc_dict = {}
@@ -266,12 +252,7 @@ def get_Dicts(spro_file):
                 units_dict[key] = line.split(" ")[-1].strip() 
                 desc_dict[key] = line.split("[")[0].split(":")[1].strip()
 
-    if "Outlet volumetric flux" in desc_dict.items():
-        isMassFlow = False
-    else:
-        isMassFlow = True
-
-    return units_dict, desc_dict, isMassFlow
+    return units_dict, desc_dict
 
 def get_design_point(spro_file):
 
