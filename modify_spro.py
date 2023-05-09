@@ -104,6 +104,11 @@ def modify_spro(spro_file, CV_stage_components):
                 data[line_number] = line.replace("transient", "steady")
                 break
 
+    with open(spro_file, 'w') as outfile:
+        data = "".join(data)
+        outfile.write(data)
+  
+
     # Gets the template of the efficiency expression:
     with open(spro_file, 'r') as infile:
         data = infile.readlines()
