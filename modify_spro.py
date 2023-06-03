@@ -12,7 +12,7 @@ def get_stage_components(spro_file):
     with open(spro_file, 'r') as infile:
         data = infile.readlines()
         for line in data:
-            if "vc volume=" in line:
+            if "vc volume=" in line and "model=" in line:
                 volumes.append(line.split("\"")[1])
 
     volumes =  list(dict.fromkeys(volumes)) 
