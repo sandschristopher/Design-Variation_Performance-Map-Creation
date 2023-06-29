@@ -61,58 +61,70 @@ def build_template(cft_batch_file, template_file):
                                                     break
 
                                             for line_number7, line7 in enumerate(wire_section):
-                                                if "<ConnectorPoint" in line7:
-                                                    try:
-                                                        point_index = re.search("Index=\"(.+?)\"", line7).group(1)
-                                                    except AttributeError:
-                                                        next
-                                                    
+                                                
+                                                if "<Connectors " in line7:
+                                
                                                     for line_number8, line8 in enumerate(data[(line_number1 + line_number3 + line_number5 + line_number7):]):
-                                                        if "</ConnectorPoint>" in line8:
-                                                            point_section = data[(line_number1 + line_number3 + line_number5 + line_number7):(line_number1 + line_number3 + line_number5 + line_number7 + line_number8)]
+                                                        
+                                                        if "</Connectors>" in line8:
+                                                            connectors_section = data[(line_number1 + line_number3 + line_number5 + line_number7):(line_number1 + line_number3 + line_number5 + line_number7 + line_number8)]
                                                             break
 
-                                                    for line_number9, line9 in enumerate(point_section):
-                                                        if "Caption=" in line9:
-                                                            variable = line9.split(" ")[0].strip()[1:]
-                                                            master[component][variable + wire_name + variable + point_index] = {}
-                                                            if "</" + variable + ">" in line9:
-                                                                try:
-                                                                    var_type = re.search("Type=\"(.+?)\"", line9).group(1)
-                                                                    master[component][variable + wire_name + variable + point_index]['var_type'] = var_type
-                                                                except AttributeError:
-                                                                    next
-
-                                                                try:
-                                                                    count = re.search("Count=\"(.+?)\"", line9).group(1)
-                                                                    master[component][variable + wire_name + variable + point_index]['count'] = count
-                                                                except AttributeError:
-                                                                    next
-
-                                                                try:
-                                                                    caption = re.search("Caption=\"(.+?)\"", line9).group(1)
-                                                                    master[component][variable + wire_name + variable + point_index]['caption'] = caption
-                                                                except AttributeError:
-                                                                    next
-
-                                                                try:
-                                                                    desc = re.search("Desc=\"(.+?)\"", line9).group(1)
-                                                                    master[component][variable + wire_name + variable + point_index]['desc'] = desc
-                                                                except AttributeError:
-                                                                    next
-                                                                
-                                                                try:
-                                                                    unit = re.search("Unit=\"(.+?)\"", line9).group(1)
-                                                                    master[component][variable + wire_name + variable + point_index]['unit'] = unit
-                                                                except AttributeError:
-                                                                    next
-
-                                                                value = ">" + re.search(">(.*)</", line9).group(1) + "<"
-                                                                marker = ">{" + component + "_" + wire_name + "_" + variable + "_" + point_index + "_" + caption.replace(" ", '-') + "}<"
-                                                                data[line_number1 + line_number3 + line_number5 + line_number7 + line_number9] = data[line_number1 + line_number3 + line_number5 + line_number7 + line_number9].replace(value, marker)
+                                                    for line_number9, line9 in enumerate(connectors_section):
+                                                        
+                                                        if "<ConnectorPoint " in line9:
+                                                            try:
+                                                                point_index = re.search("Index=\"(.+?)\"", line9).group(1)
+                                                            except AttributeError:
+                                                                next
                                                             
-                                                                master[component][variable + wire_name + variable + point_index]['value'] = value
-                                                                master[component][variable + wire_name + variable + point_index]['marker'] = marker
+                                                            for line_number10, line10 in enumerate(data[(line_number1 + line_number3 + line_number5 + line_number7 + line_number9):]):
+                                                                
+                                                                if "</ConnectorPoint>" in line10:
+                                                                    point_section = data[(line_number1 + line_number3 + line_number5 + line_number7 + line_number9):(line_number1 + line_number3 + line_number5 + line_number7 + line_number9 + line_number10)]
+                                                                    break
+
+                                                            for line_number11, line11 in enumerate(point_section):
+                                                                if "Caption=" in line11:
+                                                                    variable = line11.split(" ")[0].strip()[1:]
+                                                                    master[component][variable + wire_name + variable + point_index] = {}
+                                                                    if "</" + variable + ">" in line11:
+                                                                        try:
+                                                                            var_type = re.search("Type=\"(.+?)\"", line11).group(1)
+                                                                            master[component][variable + wire_name + variable + point_index]['var_type'] = var_type
+                                                                        except AttributeError:
+                                                                            next
+
+                                                                        try:
+                                                                            count = re.search("Count=\"(.+?)\"", line11).group(1)
+                                                                            master[component][variable + wire_name + variable + point_index]['count'] = count
+                                                                        except AttributeError:
+                                                                            next
+
+                                                                        try:
+                                                                            caption = re.search("Caption=\"(.+?)\"", line11).group(1)
+                                                                            master[component][variable + wire_name + variable + point_index]['caption'] = caption
+                                                                        except AttributeError:
+                                                                            next
+
+                                                                        try:
+                                                                            desc = re.search("Desc=\"(.+?)\"", line11).group(1)
+                                                                            master[component][variable + wire_name + variable + point_index]['desc'] = desc
+                                                                        except AttributeError:
+                                                                            next
+                                                                        
+                                                                        try:
+                                                                            unit = re.search("Unit=\"(.+?)\"", line11).group(1)
+                                                                            master[component][variable + wire_name + variable + point_index]['unit'] = unit
+                                                                        except AttributeError:
+                                                                            next
+
+                                                                        value = ">" + re.search(">(.*)</", line11).group(1) + "<"
+                                                                        marker = ">{" + component + "_" + wire_name + "_" + variable + "_" + point_index + "_" + caption.replace(" ", '-') + "}<"
+                                                                        data[line_number1 + line_number3 + line_number5 + line_number7 + line_number9 + line_number11] = data[line_number1 + line_number3 + line_number5 + line_number7 + line_number9 + line_number11].replace(value, marker)
+                                                                    
+                                                                        master[component][variable + wire_name + variable + point_index]['value'] = value
+                                                                        master[component][variable + wire_name + variable + point_index]['marker'] = marker
 
                                                 elif "<Curve " in line7:
                                                     try:
@@ -178,7 +190,6 @@ def build_template(cft_batch_file, template_file):
                                                                     
                                                                         master[component][variable + wire_name + "curve" + curve_index + variable + point_index]['value'] = value
                                                                         master[component][variable + wire_name + "curve" + curve_index + variable + point_index]['marker'] = marker
-
 
                                 if "<TMeanLine" in line3 and "Index=" in line3:
 
@@ -360,7 +371,7 @@ def build_template(cft_batch_file, template_file):
                 
 
                                 elif "Caption=" in line3:
-                                    if not any(line3 in string for string in mean_line_sections):
+                                    if not any(line3 in string for string in mean_line_sections) and not any(line3 in string for string in secondary_flow_path_sections):
                                         variable = line3.split(" ")[0].strip()[1:]
 
                                         try:
