@@ -904,7 +904,7 @@ def combine_csv(project_name):
         solver_type = csv.split(".")[0].split("_")[-1]
         df = pd.read_csv(csv)
         df.to_excel(writer, sheet_name=solver_type, index=False)
-    writer.save()
+    writer.close()
 
     return 0
 
