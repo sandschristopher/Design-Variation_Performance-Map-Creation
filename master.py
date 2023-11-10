@@ -762,7 +762,7 @@ def post_process(run_design_variation_bool, project_name, spro_dict, steady_avg_
 
     integrals_file = spro_dict.get('file_name').replace(".spro", "_integrals.txt")
 
-    units_dict, desc_dict = get_Dicts(spro_dict.get("file_name"))
+    units_dict, desc_dict, isMassFlow = get_Dicts(spro_dict.get("file_name"))
 
     [(vflow_out_design_value), (omega_design_value, omega_design_units)], isMassFlow = get_design_point(spro_dict.get("file_name"))
 
