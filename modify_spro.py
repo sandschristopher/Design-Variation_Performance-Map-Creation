@@ -12,7 +12,7 @@ def get_stage_components(spro_file):
     with open(spro_file, 'r') as infile:
         data = infile.readlines()
         for line in data:
-            if "vc volume=" in line and "model=" in line:
+            if "vc volume=" in line:
                 volumes.append(line.split("\"")[1])
 
     volumes =  list(dict.fromkeys(volumes)) 
@@ -31,11 +31,11 @@ def get_stage_components(spro_file):
             stage_components.append(int(input("\nEnter the number associated with the final component of the " + str(p.ordinal(CV_index + 1)) + " CV: ")))
             CV_stage_components.append(stage_components)
 
-        return CV_stage_components
+        return CV_stage_components, volumes
     else:
-        return 0
+        return 0, volumes
 
-def modify_spro(spro_file, CV_stage_components):
+def modify_spro(spro_file, CV_stage_components, volumes):
 
     # Gets patch names for each componenet:
     patches = []
@@ -104,11 +104,6 @@ def modify_spro(spro_file, CV_stage_components):
                 data[line_number] = line.replace("transient", "steady")
                 break
 
-    with open(spro_file, 'w') as outfile:
-        data = "".join(data)
-        outfile.write(data)
-  
-
     # Gets the template of the efficiency expression:
     with open(spro_file, 'r') as infile:
         data = infile.readlines()
@@ -169,6 +164,9 @@ def modify_spro(spro_file, CV_stage_components):
                 data = "".join(data)
                 outfile.write(data)
 
+    for volume_index, volume in enumerate(volumes, start=1):
+        insert_line(indent + "#vapor volume fraction, " + volume + " [-]" + "\n" + indent + "plot.vvf" + str(volume_index) + " = cavitation.vap_vf@\"" + volume + "\"\n" + indent + "#plot.vvf" + str(volume_index) + ":vapor volume fraction, " + volume + " [-]")
+
     if "PC" in efficiency_expression:
         insert_line(indent + "#head [m]" + "\n" + indent + "plot.H = plot.DPtt/rho/9.81 \n" + indent + "#plot.H:head [m]")
 
@@ -181,7 +179,7 @@ def modify_spro(spro_file, CV_stage_components):
 
             for patch in stage_patches[1:-1]:
                 for turbo in turbos:
-                    if turbo[0] in patch:
+                    if turbo[0] in patch and "Outflow" in patch:
                         stage_power_components.append("plot.PC" + turbo[1])
 
             stage_power_components = list(set(stage_power_components))
@@ -197,7 +195,13 @@ def modify_spro(spro_file, CV_stage_components):
                 + CVIs[stage_components[-1]] + "\"-flow.mpt@\"" + CVIs[(stage_components[0] - 1)] + "\"\n" + indent + "#plot.DPtt_CV" + str(CV_index) + ":delta p (t-t), CV" + str(CV_index) + " [Pa]")
             
             if stage_power != False:
-                insert_line(indent + "#efficiency (t-t), CV" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_CV" + str(CV_index) + " = "
+                if "PC" in efficiency_expression:
+                    insert_line(indent + "#efficiency (t-t), CV" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_CV" + str(CV_index) + " = "
+                    + efficiency_expression.replace(inlet, CVIs[(stage_components[0] - 1)]).replace(outlet, CVIs[stage_components[-1]]).replace(efficiency_expression.split("/")[-1], stage_power)
+                        + "\n" + indent + "#plot.Eff_tt_CV" + str(CV_index) + ":efficiency (t-t), CV" + str(CV_index) + " [-]")
+
+                else:
+                    insert_line(indent + "#efficiency (t-t), CV" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_CV" + str(CV_index) + " = "
                     + efficiency_expression.replace(inlet, CVIs[(stage_components[0] - 1)]).replace(outlet, CVIs[stage_components[-1]])
                         + "\n" + indent + "#plot.Eff_tt_CV" + str(CV_index) + ":efficiency (t-t), CV" + str(CV_index) + " [-]")
 
@@ -247,6 +251,8 @@ def modify_spro(spro_file, CV_stage_components):
 
 def get_Dicts(spro_file):
 
+    isMassFlow = False
+
     with open(spro_file, "r") as infile:
         units_dict = {}
         desc_dict = {}
@@ -257,7 +263,12 @@ def get_Dicts(spro_file):
                 units_dict[key] = line.split(" ")[-1].strip() 
                 desc_dict[key] = line.split("[")[0].split(":")[1].strip()
 
-    return units_dict, desc_dict
+    if "Outlet volumetric flux" in desc_dict.items():
+        isMassFlow = False
+    else:
+        isMassFlow = True
+
+    return units_dict, desc_dict, isMassFlow
 
 def get_design_point(spro_file):
 
