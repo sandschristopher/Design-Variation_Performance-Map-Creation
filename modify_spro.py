@@ -197,7 +197,7 @@ def modify_spro(spro_file, CV_stage_components, volumes):
             if stage_power != False:
                 if "PC" in efficiency_expression:
                     insert_line(indent + "#efficiency (t-t), CV" + str(CV_index) + " [-]" + "\n" + indent + "plot.Eff_tt_CV" + str(CV_index) + " = "
-                    + efficiency_expression.replace(inlet, CVIs[(stage_components[0] - 1)]).replace(outlet, CVIs[stage_components[-1]]).replace(efficiency_expression.split("/")[-1], stage_power)
+                    + efficiency_expression.replace(inlet, CVIs[(stage_components[0] - 1)]).replace(outlet, CVIs[stage_components[-1]]).replace(efficiency_expression.split("/")[-1], stage_power).replace("plot.DPtt", "plot.DPtt_CV" + str(CV_index))
                         + "\n" + indent + "#plot.Eff_tt_CV" + str(CV_index) + ":efficiency (t-t), CV" + str(CV_index) + " [-]")
 
                 else:
