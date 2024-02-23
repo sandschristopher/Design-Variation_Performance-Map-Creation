@@ -79,7 +79,7 @@ def modify_spro(spro_file, CV_stage_components, volumes):
     with open(spro_file, 'r') as infile:
         data = infile.readlines()
         for line_number, line in enumerate(data):
-            if "#power" in line:
+            if "#power" in line or "#Power" in line:
                 try:
                     turbo_number = search("plot.PC(\d)", data[line_number + 1].split("=")[0]).group(1)
                     if turbo_number is not None:
