@@ -99,10 +99,15 @@ def modify_spro(spro_file, CV_stage_components, volumes):
     # Ensures consistent .sgrd file:
     with open(spro_file, 'r') as infile:
         data = infile.readlines()
-        for line_number, line in enumerate(data):
-            if ".sgrd" in line:
-                data[line_number] = line.replace("transient", "steady")
-                break
+
+    for line_number, line in enumerate(data):
+        if ".sgrd" in line:
+            data[line_number] = line.replace("transient", "steady")
+            break
+
+    # Write the modified content back to the file
+    with open(spro_file, 'w') as outfile:
+        outfile.writelines(data)
 
     # Gets the template of the efficiency expression:
     with open(spro_file, 'r') as infile:
